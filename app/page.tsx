@@ -135,7 +135,7 @@ export default function Home() {
 
       {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a] text-white px-6 md:px-12 py-5 flex justify-between items-center border-b border-white/5 shadow-2xl">
-        <div className="flex-1 text-[11px] font-black tracking-[5px] uppercase text-white">Luxe Drive</div>
+        <div className="flex-1 text-[11px] font-black tracking-[5px] uppercase text-white">ZaFah</div>
         
         {/* Smart Search */}
         <div ref={searchRef} className="flex-[1.5] max-w-sm hidden md:flex flex-col relative mx-4">
@@ -167,7 +167,7 @@ export default function Home() {
         </div>
 
         <div className="flex-1 flex justify-end items-center gap-8">
-          <span className="text-[9px] tracking-[6px] font-bold uppercase opacity-60 hidden lg:block text-zinc-400">Luxury Service</span>
+          <span className="text-[9px] tracking-[6px] font-bold uppercase opacity-60 hidden lg:block text-zinc-400"> LUXURY SERVICES</span>
           <a href={`tel:+${myWhatsAppNumber}`} className="text-[9px] font-bold tracking-[3px] uppercase border border-white/20 px-6 py-2.5 rounded-full hover:bg-white hover:text-black transition-all">Connect</a>
         </div>
       </nav>
@@ -383,7 +383,7 @@ export default function Home() {
       <footer className="relative z-10 py-16 bg-[#0a0a0a] border-t border-white/5 text-white">
         <div className="max-w-7xl mx-auto px-10 flex flex-col md:flex-row justify-between items-center gap-10">
           <div className="flex flex-col items-center md:items-start gap-2">
-            <p className="text-[10px] font-black uppercase tracking-[6px]">Luxe Drive</p>
+            <p className="text-[10px] font-black uppercase tracking-[6px]">ZaFah</p>
             <p className="text-[9px] font-bold tracking-[4px] opacity-40 uppercase">Excellence Defined</p>
           </div>
           <div className="flex items-center gap-4 group">

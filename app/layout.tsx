@@ -26,7 +26,8 @@ export const metadata = {
     description: 'Experience the pinnacle of luxury driving in Egypt.',
     images: ['/og-image.jpg'], // حط صورة فخمة لعربية هنا
     verification: {
-    google: 'google8db74195b4431746', // انقل الكود بالظبط من الصورة اللي فاتت
+    google: 'aNw4-6fK-u-7HktWQ5SA2xXS3uy9dbYfIZMwCOvyIEo',
   },
+  
   },
 }
