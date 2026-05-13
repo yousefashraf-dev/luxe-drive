@@ -134,20 +134,9 @@ export default function Home() {
       </div>
 
       {/* Navigation */}
-        <nav className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a] text-white px-6 md:px-12 py-5 flex justify-between items-center border-b border-white/5 shadow-2xl">
-{/* Professional English Logo */}
-<div className="flex-1 flex flex-col items-start cursor-default group">
-  <div className="relative">
-    <span className="font-playfair text-4xl font-bold text-white tracking-tight transition-all duration-700 group-hover:text-[#c5a059]">
-      ZAFHH
-    </span>
-    <div className="absolute -bottom-1 left-0 h-[1px] w-0 bg-[#c5a059] transition-all duration-700 group-hover:w-full"></div>
-  </div>
-  <span className="text-[7px] tracking-[0.8em] text-zinc-500 uppercase font-inter mt-2 ml-1">
-    Luxury Rental
-  </span>
-</div>
-   
+      <nav className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a] text-white px-6 md:px-12 py-5 flex justify-between items-center border-b border-white/5 shadow-2xl">
+        <div className="flex-1 text-[11px] font-black tracking-[5px] uppercase text-white">Luxe Drive</div>
+        
         {/* Smart Search */}
         <div ref={searchRef} className="flex-[1.5] max-w-sm hidden md:flex flex-col relative mx-4">
           <div className="relative flex items-center w-full">
@@ -214,68 +203,33 @@ export default function Home() {
         {/* Fleet Grid */}
         <section ref={fleetRef} className="max-w-7xl mx-auto px-4 md:px-6 pb-40">
 
-          {/* Mobile horizontal scroll hint */}
-          <p className="text-[9px] text-white/40 uppercase tracking-[4px] mb-6 text-center md:hidden">
-            اسحب للتصفح ←
-          </p>
-
-          {/* Mobile: horizontal scroll | Desktop: grid */}
           {loading ? (
-            <>
-              {/* Skeleton loaders */}
-              <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-12">
-                {[1,2,3].map(i => (
-                  <div key={i} className="bg-white rounded-[2rem] overflow-hidden shadow-sm border border-zinc-100 flex flex-col animate-pulse">
-                    <div className="h-80 bg-zinc-200" />
-                    <div className="p-10 space-y-4">
-                      <div className="h-8 bg-zinc-200 rounded-xl w-2/3" />
-                      <div className="h-4 bg-zinc-100 rounded-xl w-1/2" />
-                      <div className="h-14 bg-zinc-200 rounded-2xl mt-6" />
+            /* Skeleton — same layout both mobile & desktop */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
+              {[1,2,3].map(i => (
+                <div key={i} className="rounded-[2rem] overflow-hidden border border-white/10 bg-white/10 backdrop-blur-md animate-pulse">
+                  <div className="h-56 md:h-72 bg-white/10" />
+                  <div className="px-6 py-5 bg-black/40 flex items-center justify-between">
+                    <div className="space-y-2">
+                      <div className="h-3 w-16 bg-white/20 rounded-full" />
+                      <div className="h-5 w-24 bg-white/20 rounded-full" />
                     </div>
+                    <div className="h-10 w-20 bg-white/20 rounded-2xl" />
                   </div>
-                ))}
-              </div>
-              {/* Mobile skeleton */}
-              <div className="flex gap-5 overflow-x-auto pb-4 md:hidden snap-x snap-mandatory scroll-smooth">
-                {[1,2,3].map(i => (
-                  <div key={i} className="min-w-[82vw] bg-white rounded-[2rem] overflow-hidden shadow-sm border border-zinc-100 flex flex-col animate-pulse snap-center">
-                    <div className="h-64 bg-zinc-200" />
-                    <div className="p-8 space-y-4">
-                      <div className="h-8 bg-zinc-200 rounded-xl w-2/3" />
-                      <div className="h-4 bg-zinc-100 rounded-xl w-1/2" />
-                      <div className="h-14 bg-zinc-200 rounded-2xl mt-4" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : filteredCars.length > 0 ? (
-            <>
-              {/* Desktop grid */}
-              <div className="hidden md:grid md:grid-cols-2 lg:grid-cols-3 gap-12">
-                {filteredCars.map((car) => (
-                  <CarCard key={car.id} car={car} onClick={() => handleSelectCar(car)} />
-                ))}
-              </div>
+                </div>
+              ))}
+            </div>
 
-              {/* Mobile: horizontal snap scroll */}
-              <div
-                className="flex gap-5 overflow-x-auto pb-6 md:hidden snap-x snap-mandatory scroll-smooth"
-                style={{ WebkitOverflowScrolling: 'touch', scrollbarWidth: 'none' }}
-              >
-                {filteredCars.map((car) => (
-                  <div
-                    key={car.id}
-                    className="min-w-[82vw] snap-center flex-shrink-0"
-                    onClick={() => handleSelectCar(car)}
-                  >
-                    <CarCard car={car} />
-                  </div>
-                ))}
-              </div>
-            </>
+          ) : filteredCars.length > 0 ? (
+            /* ── Single unified grid: 1 col on mobile, 2–3 on desktop ── */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
+              {filteredCars.map((car) => (
+                <CarCard key={car.id} car={car} onClick={() => handleSelectCar(car)} />
+              ))}
+            </div>
+
           ) : (
-            <div className="col-span-full py-20 text-center text-zinc-400 font-serif italic">
+            <div className="py-20 text-center text-white/40 font-serif italic">
               No vehicles matching your search found.
             </div>
           )}
@@ -463,26 +417,25 @@ function CarCard({ car, onClick }: { car: any; onClick?: () => void }) {
     <div
       className="group relative cursor-pointer"
       onClick={onClick}
-      style={{ perspective: '1000px' }}
     >
-      {/* Floating glow shadow */}
+      {/* Floating glow on hover (desktop) */}
       <div className="absolute -inset-1 rounded-[2rem] bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none" />
-      
+
       {/* Card body */}
-      <div className="relative rounded-[2rem] overflow-hidden border border-white/20 backdrop-blur-md bg-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.35)] group-hover:shadow-[0_20px_60px_rgba(0,0,0,0.55)] transition-all duration-700 group-hover:-translate-y-2">
-        
-        {/* Image */}
-        <div className="relative h-64 md:h-72 overflow-hidden">
+      <div className="relative rounded-[2rem] overflow-hidden border border-white/20 backdrop-blur-md bg-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.35)] group-hover:shadow-[0_20px_60px_rgba(0,0,0,0.55)] transition-all duration-500 group-hover:-translate-y-1 active:scale-[0.98]">
+
+        {/* Image — taller on mobile for better visual impact */}
+        <div className="relative h-[58vw] md:h-72 overflow-hidden">
           <img
             src={Array.isArray(car.image) ? car.image[0] : car.image}
             className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-105"
             alt={car.name}
             loading="lazy"
           />
-          {/* Gradient overlay bottom */}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+          {/* Bottom gradient */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
 
-          {/* Badges */}
+          {/* Badges row */}
           <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
             {car.isVIP ? (
               <div className="bg-white text-black px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
@@ -495,9 +448,9 @@ function CarCard({ car, onClick }: { car: any; onClick?: () => void }) {
             </div>
           </div>
 
-          {/* Car name over image bottom */}
-          <div className="absolute bottom-0 left-0 right-0 p-6">
-            <h3 className="font-serif text-3xl italic text-white leading-tight drop-shadow-lg">
+          {/* Car name — bottom of image */}
+          <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6">
+            <h3 className="font-serif text-2xl md:text-3xl italic text-white leading-tight drop-shadow-lg">
               {car.name}
             </h3>
             <p className="text-[8px] text-white/50 uppercase tracking-[4px] font-bold mt-1">
@@ -506,13 +459,15 @@ function CarCard({ car, onClick }: { car: any; onClick?: () => void }) {
           </div>
         </div>
 
-        {/* Bottom strip */}
-        <div className="flex items-center justify-between px-6 py-5 bg-black/60 backdrop-blur-sm">
+        {/* Bottom strip — price + CTA */}
+        <div className="flex items-center justify-between px-5 md:px-6 py-4 md:py-5 bg-black/60 backdrop-blur-sm">
           <div>
             <p className="text-[8px] text-white/40 uppercase tracking-[3px] font-bold">Per Day</p>
-            <p className="text-xl font-bold text-white mt-0.5">{car.price} <span className="text-[10px] text-white/50 font-normal">EGP</span></p>
+            <p className="text-lg md:text-xl font-bold text-white mt-0.5">
+              {car.price} <span className="text-[10px] text-white/50 font-normal">EGP</span>
+            </p>
           </div>
-          <div className="flex items-center gap-2 bg-white/10 hover:bg-white group/btn rounded-2xl px-5 py-3 border border-white/20 transition-all duration-300">
+          <div className="flex items-center gap-2 bg-white/10 active:bg-white hover:bg-white group/btn rounded-2xl px-5 py-3 border border-white/20 transition-all duration-300">
             <span className="text-[9px] font-bold uppercase tracking-[3px] text-white group-hover/btn:text-black transition-colors">
               View
             </span>
