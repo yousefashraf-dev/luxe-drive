@@ -70,7 +70,7 @@ export default function ChatWidget({ isOpen: externalOpen, setIsOpen: setExterna
       setIsLoading(false);
     }
   };
-
+return null;
   return (
     <div className="fixed bottom-5 right-5 z-[300] font-sans text-right" dir="rtl">
       <button 
