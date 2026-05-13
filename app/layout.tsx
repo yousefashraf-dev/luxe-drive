@@ -25,5 +25,8 @@ export const metadata = {
     title: 'ZAFHH Luxury Rental',
     description: 'Experience the pinnacle of luxury driving in Egypt.',
     images: ['/og-image.jpg'], // حط صورة فخمة لعربية هنا
+    verification: {
+    google: 'google8db74195b4431746', // انقل الكود بالظبط من الصورة اللي فاتت
+  },
   },
 }
