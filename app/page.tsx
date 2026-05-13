@@ -135,22 +135,19 @@ export default function Home() {
 
       {/* Navigation */}
         <nav className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a] text-white px-6 md:px-12 py-5 flex justify-between items-center border-b border-white/5 shadow-2xl">
-{/* Luxury English Logo Only */}
+{/* Professional English Logo */}
 <div className="flex-1 flex flex-col items-start cursor-default group">
   <div className="relative">
-    {/* الاسم الأساسي بخط Serif فخم */}
-    <span className="font-playfair text-4xl md:text-5xl font-bold text-white tracking-tight leading-none transition-all duration-700 group-hover:text-[#c5a059]">
+    <span className="font-playfair text-4xl font-bold text-white tracking-tight transition-all duration-700 group-hover:text-[#c5a059]">
       ZAFHH
     </span>
-    {/* خط ديكور ذهبي صغير يظهر تحت الاسم */}
-    <div className="absolute -bottom-2 left-0 h-[1px] w-0 bg-[#c5a059] transition-all duration-700 group-hover:w-full"></div>
+    <div className="absolute -bottom-1 left-0 h-[1px] w-0 bg-[#c5a059] transition-all duration-700 group-hover:w-full"></div>
   </div>
-  
-  {/* السلوجان تحت الاسم بتباعد حروف كبير */}
-  <span className="text-[7px] md:text-[8px] tracking-[0.8em] text-zinc-500 uppercase font-inter mt-3 ml-1 transition-all duration-700 group-hover:text-white/60">
+  <span className="text-[7px] tracking-[0.8em] text-zinc-500 uppercase font-inter mt-2 ml-1">
     Luxury Rental
   </span>
-</div>     
+</div>
+   
         {/* Smart Search */}
         <div ref={searchRef} className="flex-[1.5] max-w-sm hidden md:flex flex-col relative mx-4">
           <div className="relative flex items-center w-full">
