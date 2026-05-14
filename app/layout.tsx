@@ -18,16 +18,19 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     </html>
   );
 }
+
 export const metadata = {
   title: 'ZAFHH Luxury | Elite Car Rental Egypt',
   description: 'ZAFHH Luxury (زفـه) - تأجير أفخم السيارات في مصر. أسطول متميز يضم BMW ومرسيدس بأفضل الأسعار وخدمة ملكية.',
   openGraph: {
     title: 'ZAFHH Luxury Rental',
     description: 'Experience the pinnacle of luxury driving in Egypt.',
-    images: ['/og-image.jpg'], // حط صورة فخمة لعربية هنا
-    verification: {
+    images: ['/og-image.jpg'],
+  },
+  verification: {
     google: 'aNw4-6fK-u-7HktWQ5SA2xXS3uy9dbYfIZMwCOvyIEo',
+    other: {
+      'google-site-verification': ['aNw4-6fK-u-7HktWQ5SA2xXS3uy9dbYfIZMwCOvyIEo'],
+    },
   },
-  
-  },
-}
+};

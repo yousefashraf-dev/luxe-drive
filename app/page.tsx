@@ -256,7 +256,7 @@ export default function Home() {
               {/* Zoom hint */}
               <div className="absolute bottom-4 right-4 bg-black/40 backdrop-blur-sm text-white rounded-full px-3 py-1.5 flex items-center gap-1.5 pointer-events-none">
                 <ZoomIn size={12} />
-                <span className="text-[9px] tracking-widest uppercase">اضغط للتكبير</span>
+              
               </div>
               {selectedCar.images.length > 1 && (
                 <div className="absolute inset-0 flex items-center justify-between px-4 md:px-6">
@@ -272,10 +272,9 @@ export default function Home() {
               )}
             </div>
 
-            {/* Info side */}
+          {/* Info side */}
             <div className="md:w-2/5 p-7 md:p-14 flex flex-col justify-between bg-[#F2F2F2] overflow-y-auto" style={{ WebkitOverflowScrolling: 'touch' }}>
               
-              {/* Header: اسم العربية + زرار X */}
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1 text-right pr-4">
                   <h2 className="font-serif text-4xl md:text-5xl font-light italic text-black leading-tight">
@@ -285,16 +284,14 @@ export default function Home() {
                   <p className="text-[9px] text-zinc-400 uppercase tracking-[4px] mt-2">Premium Class</p>
                 </div>
                 
-                {/* X button with spin animation */}
                 <button
                   onClick={handleCloseModal}
-                  className="close-btn flex-shrink-0 w-11 h-11 text-black rounded-full hover:bg-black hover:text-white transition-all bg-white shadow-md flex items-center justify-center group mt-1"
+                  className="z-[100] transition-all absolute top-4 right-4 w-10 h-10 bg-white/40 backdrop-blur-md text-black rounded-full shadow-lg flex items-center justify-center md:relative md:top-auto md:right-auto md:mt-1 md:w-11 md:h-11 md:bg-white md:shadow-md hover:bg-black hover:text-white group"
                   aria-label="Close"
                 >
                   <X size={18} className="transition-transform duration-500 group-hover:rotate-90" />
                 </button>
               </div>
-
               <div className="space-y-6 mt-4">
                 <p className="text-zinc-500 text-base leading-relaxed text-right font-light italic">
                   {selectedCar.description}
@@ -438,10 +435,10 @@ function CarCard({ car, onClick }: { car: any; onClick?: () => void }) {
           {/* Badges row */}
           <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
             {car.isVIP ? (
-              <div className="bg-white text-black px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg">
-                <Star size={9} fill="black" />
-                <span className="text-[8px] font-black tracking-[2px] uppercase">VIP Choice</span>
-              </div>
+              <div className="bg-[#D4AF37] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md">
+  <Star size={10} fill="white" stroke="none" />
+  <span className="text-[9px] font-black tracking-[2px] uppercase">VIP Choice</span>
+</div>
             ) : <div />}
             <div className="bg-white/15 backdrop-blur-md text-white px-3 py-1 rounded-full border border-white/20">
               <span className="text-[8px] font-bold tracking-[2px] uppercase">Active Fleet</span>
