@@ -2,17 +2,29 @@
 'use client';
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
-import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share } from 'lucide-react';
+import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share2, Link2, Check } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, updateDoc, doc, increment } from 'firebase/firestore';
 
-/* ─── helper: detect iOS / Android ─── */
+/* ─── detect iOS / Android ─── */
 function getOS(): 'ios' | 'android' | 'other' {
   if (typeof navigator === 'undefined') return 'other';
   const ua = navigator.userAgent;
   if (/iPad|iPhone|iPod/.test(ua)) return 'ios';
   if (/Android/.test(ua)) return 'android';
   return 'other';
+}
+
+/* ─── Share helper ─── */
+async function shareCar(car: any) {
+  const url   = `${window.location.origin}?car=${car.id}`;
+  const title = `${car.name} — ZaFah Luxury Rental`;
+  const text  = `${car.name} متاحة للإيجار بسعر ${car.price} EGP / يوم 🚗`;
+  if (navigator.share) {
+    try { await navigator.share({ title, text, url }); } catch (_) {}
+  } else {
+    await navigator.clipboard.writeText(url);
+  }
 }
 
 /* ─── PWA Install Banner ─── */
@@ -27,74 +39,60 @@ function InstallBanner({ onDismiss }: { onDismiss: () => void }) {
   }, []);
 
   const handleAndroidInstall = async () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      await deferredPrompt.userChoice;
-    }
+    if (deferredPrompt) { deferredPrompt.prompt(); await deferredPrompt.userChoice; }
     onDismiss();
   };
 
-  if (os === 'ios') {
-    return (
-      <div className="fixed bottom-5 left-4 right-4 z-[400] animate-in slide-in-from-bottom-4 duration-500">
-        <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-5 shadow-2xl">
-          <button onClick={onDismiss} className="absolute top-4 right-4 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center group">
-            <X size={13} className="text-white/60 group-hover:text-white transition-colors" />
-          </button>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="w-10 h-10 rounded-2xl bg-[#c5a059]/20 flex items-center justify-center">
-              <Share size={18} className="text-[#c5a059]" />
-            </div>
-            <div>
-              <p className="text-white text-sm font-bold">أضف ZaFah لشاشتك</p>
-              <p className="text-white/40 text-[10px] tracking-wider uppercase">تجربة تطبيق كاملة</p>
-            </div>
+  if (os === 'ios') return (
+    <div className="fixed bottom-5 left-4 right-4 z-[400] animate-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-5 shadow-2xl">
+        <button onClick={onDismiss} className="absolute top-4 right-4 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center group">
+          <X size={13} className="text-white/60 group-hover:text-white transition-colors" />
+        </button>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-10 h-10 rounded-2xl bg-[#c5a059]/20 flex items-center justify-center">
+            <Share2 size={18} className="text-[#c5a059]" />
           </div>
-          <div className="space-y-2.5 text-right" dir="rtl">
-            <div className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3">
-              <span className="text-white/40 text-[11px] font-bold">١</span>
-              <p className="text-white/70 text-[12px]">اضغط زرار <span className="text-[#c5a059] font-bold">Share</span> في أسفل المتصفح</p>
-            </div>
-            <div className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3">
-              <span className="text-white/40 text-[11px] font-bold">٢</span>
-              <p className="text-white/70 text-[12px]">اختار <span className="text-[#c5a059] font-bold">"Add to Home Screen"</span></p>
-            </div>
-            <div className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3">
-              <span className="text-white/40 text-[11px] font-bold">٣</span>
-              <p className="text-white/70 text-[12px]">اضغط <span className="text-[#c5a059] font-bold">"Add"</span> وهيظهر زي أي تطبيق</p>
-            </div>
+          <div>
+            <p className="text-white text-sm font-bold">أضف ZaFah لشاشتك</p>
+            <p className="text-white/40 text-[10px] tracking-wider uppercase">تجربة تطبيق كاملة</p>
           </div>
         </div>
+        <div className="space-y-2.5 text-right" dir="rtl">
+          {[
+            ['١', 'اضغط زرار', 'Share', 'في أسفل المتصفح'],
+            ['٢', 'اختار', '"Add to Home Screen"', ''],
+            ['٣', 'اضغط', '"Add"', 'وهيظهر زي أي تطبيق'],
+          ].map(([n, pre, gold, post]) => (
+            <div key={n} className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3">
+              <span className="text-white/40 text-[11px] font-bold">{n}</span>
+              <p className="text-white/70 text-[12px]">{pre} <span className="text-[#c5a059] font-bold">{gold}</span> {post}</p>
+            </div>
+          ))}
+        </div>
       </div>
-    );
-  }
+    </div>
+  );
 
-  if (os === 'android') {
-    return (
-      <div className="fixed bottom-5 left-4 right-4 z-[400] animate-in slide-in-from-bottom-4 duration-500">
-        <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-5 shadow-2xl flex items-center gap-4">
-          <div className="w-10 h-10 rounded-2xl bg-[#c5a059]/20 flex items-center justify-center flex-shrink-0">
-            <Download size={18} className="text-[#c5a059]" />
-          </div>
-          <div className="flex-1 text-right" dir="rtl">
-            <p className="text-white text-sm font-bold">ثبّت تطبيق ZaFah</p>
-            <p className="text-white/50 text-[11px]">أسرع وشغّال حتى بدون نت</p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <button
-              onClick={handleAndroidInstall}
-              className="bg-[#c5a059] text-black text-[10px] font-black uppercase tracking-wider px-4 py-2.5 rounded-2xl active:scale-95 transition-all"
-            >
-              ثبّت
-            </button>
-            <button onClick={onDismiss} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-              <X size={13} className="text-white/60" />
-            </button>
-          </div>
+  if (os === 'android') return (
+    <div className="fixed bottom-5 left-4 right-4 z-[400] animate-in slide-in-from-bottom-4 duration-500">
+      <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-5 shadow-2xl flex items-center gap-4">
+        <div className="w-10 h-10 rounded-2xl bg-[#c5a059]/20 flex items-center justify-center flex-shrink-0">
+          <Download size={18} className="text-[#c5a059]" />
+        </div>
+        <div className="flex-1 text-right" dir="rtl">
+          <p className="text-white text-sm font-bold">ثبّت تطبيق ZaFah</p>
+          <p className="text-white/50 text-[11px]">أسرع وشغّال حتى بدون نت</p>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <button onClick={handleAndroidInstall} className="bg-[#c5a059] text-black text-[10px] font-black uppercase tracking-wider px-4 py-2.5 rounded-2xl active:scale-95 transition-all">ثبّت</button>
+          <button onClick={onDismiss} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+            <X size={13} className="text-white/60" />
+          </button>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
 
   return null;
 }
@@ -116,12 +114,13 @@ export default function Home() {
   const [zoomedImage, setZoomedImage]   = useState<string | null>(null);
   const [isClosing, setIsClosing]       = useState(false);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [copied, setCopied]             = useState(false);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const fleetRef  = useRef<HTMLDivElement>(null);
   const myWhatsAppNumber = "201095976766";
 
-  /* ── Arabic search + direct filter ── */
+  /* ── Arabic + direct search ── */
   const displayCars = (cars || []).filter((car) => {
     const search = (searchQuery || "").toLowerCase();
     if (!search) return true;
@@ -132,7 +131,7 @@ export default function Home() {
     };
     const matchesDirect = carName.includes(search) || carBrand.includes(search);
     const matchesArabic = Object.keys(translations).some(
-      key => search.includes(key) && (carName.includes(translations[key]) || carBrand.includes(translations[key]))
+      k => search.includes(k) && (carName.includes(translations[k]) || carBrand.includes(translations[k]))
     );
     return matchesDirect || matchesArabic;
   });
@@ -140,20 +139,16 @@ export default function Home() {
   /* ── scroll + outside-click ── */
   useEffect(() => {
     setMounted(true);
-    const onScroll   = () => setScrollY(window.scrollY);
-    const onOutside  = (e: MouseEvent) => {
-      if (searchRef.current && !searchRef.current.contains(e.target as Node))
-        setShowSuggestions(false);
+    const onScroll  = () => setScrollY(window.scrollY);
+    const onOutside = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowSuggestions(false);
     };
     window.addEventListener("scroll", onScroll, { passive: true });
     document.addEventListener("mousedown", onOutside);
-    return () => {
-      window.removeEventListener("scroll", onScroll);
-      document.removeEventListener("mousedown", onOutside);
-    };
+    return () => { window.removeEventListener("scroll", onScroll); document.removeEventListener("mousedown", onOutside); };
   }, []);
 
-  /* ── PWA banner: once per week on mobile only ── */
+  /* ── PWA banner: once per week ── */
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const os = getOS();
@@ -167,12 +162,9 @@ export default function Home() {
     }
   }, []);
 
-  const dismissBanner = () => {
-    setShowInstallBanner(false);
-    localStorage.setItem('pwa_banner_ts', String(Date.now()));
-  };
+  const dismissBanner = () => { setShowInstallBanner(false); localStorage.setItem('pwa_banner_ts', String(Date.now())); };
 
-  /* ── Firebase + localStorage cache (5-min TTL) ── */
+  /* ── Firebase + localStorage cache ── */
   useEffect(() => {
     const fetchCars = async () => {
       try {
@@ -180,22 +172,26 @@ export default function Home() {
         if (raw) {
           const { data, ts } = JSON.parse(raw);
           if (Date.now() - ts < 5 * 60 * 1000) {
-            const sorted = [...data].sort((a, b) => (b.isVIP ? 1 : 0) - (a.isVIP ? 1 : 0));
-            setCars(sorted); setFilteredCars(sorted); setLoading(false);
-            return;
+            const sorted = [...data].sort((a, b) => {
+              const aVIP = a.isVIP === true || a.isVIP === 'true' ? 1 : 0;
+              const bVIP = b.isVIP === true || b.isVIP === 'true' ? 1 : 0;
+              return bVIP - aVIP;
+            });
+            setCars(sorted); setFilteredCars(sorted); setLoading(false); return;
           }
         }
       } catch (_) {}
       try {
-        const snap = await getDocs(collection(db, "cars"));
-        const data  = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const sorted = [...data].sort((a, b) => (b.isVIP ? 1 : 0) - (a.isVIP ? 1 : 0));
+        const snap   = await getDocs(collection(db, "cars"));
+        const data   = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const sorted = [...data].sort((a, b) => {
+          const aVIP = a.isVIP === true || a.isVIP === 'true' ? 1 : 0;
+          const bVIP = b.isVIP === true || b.isVIP === 'true' ? 1 : 0;
+          return bVIP - aVIP;
+        });
         setCars(sorted); setFilteredCars(sorted); setLoading(false);
         try { localStorage.setItem('luxe_cars_cache', JSON.stringify({ data, ts: Date.now() })); } catch (_) {}
-      } catch (err) {
-        console.error("Firebase:", err);
-        setLoading(false);
-      }
+      } catch (err) { console.error("Firebase:", err); setLoading(false); }
     };
     fetchCars();
   }, []);
@@ -205,9 +201,7 @@ export default function Home() {
     if (searchQuery.length > 0) {
       const f = cars.filter(c => c?.name?.toLowerCase().includes(searchQuery.toLowerCase()));
       setSuggestions(f.slice(0, 5)); setShowSuggestions(true);
-    } else {
-      setSuggestions([]); setShowSuggestions(false);
-    }
+    } else { setSuggestions([]); setShowSuggestions(false); }
   }, [searchQuery, cars]);
 
   const handleSelectCar = (car: any) => {
@@ -217,9 +211,14 @@ export default function Home() {
     updateDoc(doc(db, "cars", car.id), { views: increment(1) }).catch(() => {});
   };
 
-  const handleCloseModal = () => {
-    setIsClosing(true);
-    setTimeout(() => { setSelectedCar(null); setIsClosing(false); }, 300);
+  const handleCloseModal = () => { setIsClosing(true); setTimeout(() => { setSelectedCar(null); setIsClosing(false); }, 300); };
+
+  /* ── Share inside modal ── */
+  const handleShare = async () => {
+    if (!selectedCar) return;
+    await shareCar(selectedCar);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   if (!mounted) return null;
@@ -231,27 +230,20 @@ export default function Home() {
   return (
     <main className="relative min-h-screen text-[#1a1a1a] overflow-x-hidden font-sans selection:bg-black selection:text-white">
 
-      {/* ── Background — fixed, blurs on scroll ── */}
+      {/* ── Background ── */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <Image
-          src="/f30-refined.jpg"
-          alt="BMW F30 Background"
-          fill
-          priority
-          className="object-cover"
-          style={{
-            filter: `blur(${blurAmount}px)`,
-            transition: 'filter 0.08s linear',
-            transform: 'scale(1.05)',
-          }}
+          src="/f30-refined.jpg" alt="BMW F30 Background"
+          fill priority className="object-cover"
+          style={{ filter: `blur(${blurAmount}px)`, transition: 'filter 0.08s linear', transform: 'scale(1.05)' }}
         />
         <div className="absolute inset-0 bg-black/30" />
       </div>
 
-      {/* ── PWA Install Banner ── */}
+      {/* ── PWA Banner ── */}
       {showInstallBanner && <InstallBanner onDismiss={dismissBanner} />}
 
-      {/* ── Admin button ── */}
+      {/* ── Admin ── */}
       <div className="fixed top-28 right-6 z-[110]">
         <a href="/admin" className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center shadow-2xl hover:scale-110 transition-all duration-500 border border-white/20">
           <span className="text-[10px] font-bold">USF</span>
@@ -260,7 +252,6 @@ export default function Home() {
 
       {/* ════ NAV ════ */}
       <nav className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a] text-white px-6 md:px-12 py-5 flex justify-between items-center border-b border-white/5 shadow-2xl">
-
         <div className="flex-1 flex flex-col items-start cursor-default group">
           <div className="relative">
             <span className="font-serif text-2xl font-bold text-white tracking-tight transition-all duration-700 group-hover:text-[#c5a059]">ZaFah</span>
@@ -303,7 +294,6 @@ export default function Home() {
 
       {/* ════ CONTENT ════ */}
       <div className="relative z-10">
-
         <header className="px-6 md:px-10 pt-44 md:pt-56 pb-24 max-w-7xl mx-auto transition-opacity duration-500" style={{ opacity: headerOpacity }}>
           <h1 className="font-serif text-7xl md:text-[10rem] font-light leading-[0.8] tracking-tighter text-white drop-shadow-2xl">
             Elite <br />
@@ -338,7 +328,10 @@ export default function Home() {
           ) : displayCars.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
               {displayCars.map((car, index) => (
-                <CarCard key={car.id} car={car} index={index} onClick={() => handleSelectCar(car)} />
+                <CarCard key={car.id} car={car} index={index}
+                  onClick={() => handleSelectCar(car)}
+                  onShare={e => { e.stopPropagation(); shareCar(car); }}
+                />
               ))}
             </div>
           ) : (
@@ -347,11 +340,7 @@ export default function Home() {
         </section>
       </div>
 
-      {/* ════════════════════════════════════════════
-           MODAL
-           Mobile  : bottom-sheet, rounded top corners, NOT full screen
-           Desktop : centered side-by-side box
-      ════════════════════════════════════════════ */}
+      {/* ════ MODAL ════ */}
       {selectedCar && (
         <div
           className={`fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/70 backdrop-blur-md transition-all duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`}
@@ -359,40 +348,30 @@ export default function Home() {
         >
           <div className={`
             relative w-full bg-white shadow-2xl overflow-hidden
-            /* ── Mobile: bottom-sheet, max 92% height, rounded top ── */
             flex flex-col rounded-t-[2rem] max-h-[92dvh]
-            /* ── Desktop: centered box, side-by-side ── */
-            md:flex-row md:rounded-[2.5rem] md:max-h-[88vh] md:max-w-6xl md:w-full
+            md:flex-row md:rounded-[2.5rem] md:max-h-[88vh] md:max-w-6xl
             transition-all duration-300
             ${isClosing ? 'translate-y-6 opacity-0' : 'translate-y-0 opacity-100'}
           `}>
 
             {/* ── X button ── */}
-            <button
-              onClick={handleCloseModal}
-              aria-label="Close"
-              className="absolute top-4 right-4 z-[60] w-10 h-10 rounded-full bg-black text-white flex items-center justify-center shadow-xl border border-white/20 active:scale-90 transition-all duration-300 group"
-            >
+            <button onClick={handleCloseModal} aria-label="Close"
+              className="absolute top-4 right-4 z-[60] w-10 h-10 rounded-full bg-black text-white flex items-center justify-center shadow-xl border border-white/20 active:scale-90 transition-all duration-300 group">
               <X size={16} className="transition-transform duration-500 group-hover:rotate-90" />
             </button>
 
             {/* ── Image panel ── */}
             <div className="relative bg-zinc-900 flex-shrink-0 h-[48vw] min-h-[200px] max-h-[280px] md:h-auto md:w-3/5 md:max-h-[88vh]">
-              {/* صورة الموبايل والديسكتوب */}
               <img
                 src={selectedCar.images[currentImageIndex]}
                 alt={selectedCar.name}
                 className="w-full h-full object-cover cursor-zoom-in transition-opacity duration-500"
                 onClick={() => setZoomedImage(selectedCar.images[currentImageIndex])}
               />
-
-              {/* Zoom hint */}
               <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm text-white rounded-full px-3 py-1 flex items-center gap-1.5 pointer-events-none">
                 <ZoomIn size={11} />
                 <span className="text-[8px] tracking-widest">اضغط للتكبير</span>
               </div>
-
-              {/* Arrows */}
               {selectedCar.images.length > 1 && (
                 <div className="absolute inset-0 flex items-center justify-between px-3 pointer-events-none">
                   <button className="pointer-events-auto w-10 h-10 bg-black/40 backdrop-blur-md rounded-full text-white flex items-center justify-center border border-white/20 active:scale-90 transition-all"
@@ -405,8 +384,6 @@ export default function Home() {
                   </button>
                 </div>
               )}
-
-              {/* Dots */}
               {selectedCar.images.length > 1 && (
                 <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 pointer-events-none">
                   {selectedCar.images.map((_: any, i: number) => (
@@ -421,16 +398,32 @@ export default function Home() {
               className="flex-1 bg-[#F5F4F1] flex flex-col overflow-y-auto px-5 pt-5 pb-6 md:w-2/5 md:px-10 md:pt-10 md:pb-10"
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
-              {/* Car name */}
-              <div className="text-right mb-1 pr-12 md:pr-0">
+              {/* ── Car name + Share button ── */}
+              <div className="mb-1 pr-12 md:pr-0">
+                {/* اسم العربية */}
                 <h2
                   className="font-serif text-3xl md:text-5xl font-light italic text-black leading-tight"
                   style={{ fontFamily: "'Playfair Display',Georgia,serif" }}
                 >
                   {selectedCar.name}
                 </h2>
-                <div className="h-[1px] w-14 bg-black/30 mt-3 ml-auto" />
+                <div className="h-[1px] w-14 bg-black/30 mt-3" />
                 <p className="text-[8px] text-zinc-400 uppercase tracking-[4px] mt-2 font-bold">Premium Class</p>
+
+                {/* ── Share button — تحت الاسم مباشرة ── */}
+                <button
+                  onClick={handleShare}
+                  className="mt-4 flex items-center gap-2 bg-black text-white pl-4 pr-5 py-2.5 rounded-full shadow-md hover:bg-zinc-800 active:scale-95 transition-all duration-300 group"
+                  title="Share"
+                >
+                  {copied
+                    ? <Check size={14} className="text-green-400" />
+                    : <Share2 size={14} className="text-white" />
+                  }
+                  <span className="text-[10px] font-bold uppercase tracking-[2px]">
+                    {copied ? 'تم النسخ!' : 'Share'}
+                  </span>
+                </button>
               </div>
 
               {/* Description */}
@@ -461,7 +454,7 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* CTA buttons */}
+              {/* CTA */}
               <div className="mt-5 flex gap-3">
                 <a href={`https://wa.me/${selectedCar.phone || myWhatsAppNumber}`} target="_blank"
                   className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] text-white py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[2px] shadow-lg active:scale-95 transition-all">
@@ -481,8 +474,7 @@ export default function Home() {
       {/* ════ ZOOM LIGHTBOX ════ */}
       {zoomedImage && (
         <div className="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out" onClick={() => setZoomedImage(null)}>
-          <button className="absolute top-6 right-6 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all group z-10"
-            onClick={() => setZoomedImage(null)}>
+          <button className="absolute top-6 right-6 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all group z-10" onClick={() => setZoomedImage(null)}>
             <X size={22} className="transition-transform duration-500 group-hover:rotate-90" />
           </button>
           <img src={zoomedImage} alt="Zoomed"
@@ -523,9 +515,10 @@ export default function Home() {
 
 /* ════════════════════════════════════
    CAR CARD — Floating Luxury
-   index → أول 3 صور eager، الباقي lazy
 ════════════════════════════════════ */
-function CarCard({ car, index = 0, onClick }: { car: any; index?: number; onClick?: () => void }) {
+function CarCard({ car, index = 0, onClick, onShare }: {
+  car: any; index?: number; onClick?: () => void; onShare?: (e: React.MouseEvent) => void;
+}) {
   const isEager = index < 3;
   return (
     <div className="group relative cursor-pointer" onClick={onClick}>
@@ -543,24 +536,40 @@ function CarCard({ car, index = 0, onClick }: { car: any; index?: number; onClic
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
 
+          {/* Badges row */}
           <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
-            {car.isVIP ? (
-              <div className="bg-[#D4AF37] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md">
-                <Star size={10} fill="white" stroke="none" />
-                <span className="text-[8px] font-black tracking-[2px] uppercase">VIP Choice</span>
-              </div>
-            ) : <div />}
+
+            {/* VIP + Share دايرة تحتيه */}
+            <div className="flex flex-col items-start gap-2">
+              {(car.isVIP === true || car.isVIP === 'true') && (
+                <div className="bg-[#D4AF37] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md">
+                  <Star size={10} fill="white" stroke="none" />
+                  <span className="text-[8px] font-black tracking-[2px] uppercase">VIP Choice</span>
+                </div>
+              )}
+              {/* ── Share button خارج الكارد ── */}
+              <button
+                onClick={onShare}
+                className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center hover:bg-white active:scale-90 transition-all duration-300 group/share shadow-md"
+                title="Share"
+              >
+                <Share2 size={13} className="text-white group-hover/share:text-black transition-colors" />
+              </button>
+            </div>
+
             <div className="bg-white/15 backdrop-blur-md text-white px-3 py-1 rounded-full border border-white/20">
               <span className="text-[8px] font-bold tracking-[2px] uppercase">Active Fleet</span>
             </div>
           </div>
 
+          {/* Car name bottom */}
           <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6">
             <h3 className="font-serif text-2xl md:text-3xl italic text-white leading-tight drop-shadow-lg">{car.name}</h3>
             <p className="text-[8px] text-white/50 uppercase tracking-[4px] font-bold mt-1">Premium Class</p>
           </div>
         </div>
 
+        {/* Price strip */}
         <div className="flex items-center justify-between px-5 md:px-6 py-4 md:py-5 bg-black/60 backdrop-blur-sm">
           <div>
             <p className="text-[8px] text-white/40 uppercase tracking-[3px] font-bold">Per Day</p>

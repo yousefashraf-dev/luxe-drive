@@ -25,8 +25,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-title" content="ZaFah" />
       </head>
 
-      <body className={`${inter.variable} ${cairo.variable} antialiased`}>
-  {children}
+<body className={`${inter.variable} ${cairo.variable} antialiased`} suppressHydrationWarning>  {children}
 </body>
       
     </html>
