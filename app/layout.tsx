@@ -1,4 +1,5 @@
 import { Playfair_Display, Inter } from 'next/font/google';
+import { SpeedInsights } from '@vercel/speed-insights/next';
 import './globals.css';
 
 const playfair = Playfair_Display({
@@ -23,7 +24,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-title" content="ZaFah" />
       </head>
 
-      <body className={`${playfair.variable} ${inter.variable} antialiased`}>{children}</body>
+      <body className={`${playfair.variable} ${inter.variable} antialiased`}>
+        {children}
+        <SpeedInsights />
+      </body>
       
     </html>
   );
