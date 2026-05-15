@@ -392,7 +392,7 @@ export default function Home() {
               />
               <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm text-white rounded-full px-3 py-1 flex items-center gap-1.5 pointer-events-none">
                 <ZoomIn size={11} />
-                <span className="text-[8px] tracking-widest">اضغط للتكبير</span>
+                <span className="text-[8px] tracking-widest"> </span>
               </div>
               {selectedCar.images.length > 1 && (
                 <div className="absolute inset-0 flex items-center justify-between px-3 pointer-events-none">
@@ -421,18 +421,16 @@ export default function Home() {
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
               <div className="text-right mb-1 pr-12 md:pr-0">
-                <h2 className="font-serif text-3xl md:text-5xl font-light italic text-black leading-tight"
-                  style={{ fontFamily: "'Playfair Display',Georgia,serif" }}>
-                  {selectedCar.name}
-                </h2>
-                <div className="h-[1px] w-14 bg-black/30 mt-3 ml-auto" />
+               <h2 className="text-left text-3xl md:text-4xl font-serif font-bold text-black leading-tight mb-2 tracking-tight">
+  {selectedCar.name}
+</h2>
                 <p className="text-[8px] text-zinc-400 uppercase tracking-[4px] mt-2 font-bold">Premium Class</p>
               </div>
 
               {selectedCar.description && (
-                <p className="text-zinc-500 text-sm leading-relaxed text-right font-light italic mt-4 md:mt-6" dir="rtl">
-                  {selectedCar.description}
-                </p>
+              <p className="text-lg md:text-xl font-semibold text-slate-800 leading-relaxed text-right mt-6 pr-4 border-r-2 border-black tracking-wide">
+  {selectedCar.description}
+</p>
               )}
 
               {/* Calendar */}
