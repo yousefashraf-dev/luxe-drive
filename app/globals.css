@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0a0a0a; /* غيرت الخلفية لأسود فخم عشان تليق ببراند سيارات */
+  --foreground: #ededed;
 }
 
 @theme {
@@ -13,10 +13,32 @@
   .font-signature {
     font-family: var(--font-signature), cursive;
   }
+  
+  /* إضافة تأثير الظل للنصوص عشان تبان فوق الصور */
+  .text-shadow-premium {
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.8);
+  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  /* الخط الأساسي Cairo للعربي و Inter للإنكليزي */
+  font-family: var(--font-cairo), var(--font-inter), ui-sans-serif, system-ui;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+/* تحسين شكل الـ Scrollbar عشان يكمل اللمسة الفخمة */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0a;
+}
+::-webkit-scrollbar-thumb {
+  background: #333;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #444;
 }

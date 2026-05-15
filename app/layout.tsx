@@ -1,14 +1,16 @@
-import { Playfair_Display, Inter } from 'next/font/google';
+import { Inter, Cairo } from 'next/font/google';
 import './globals.css';
 
-const playfair = Playfair_Display({
-  subsets: ['latin'],
-  variable: '--font-playfair',
+const inter = Inter({ 
+  subsets: ['latin'], 
+  variable: '--font-inter',
+  display: 'swap',
 });
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-inter',
+const cairo = Cairo({ 
+  subsets: ['arabic'], 
+  variable: '--font-cairo',
+  display: 'swap',
 });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -23,7 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-title" content="ZaFah" />
       </head>
 
-      <body className={`${playfair.variable} ${inter.variable} antialiased`}>{children}</body>
+      <body className={`${inter.variable} ${cairo.variable} antialiased`}>
+  {children}
+</body>
       
     </html>
   );

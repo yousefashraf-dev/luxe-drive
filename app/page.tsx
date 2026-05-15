@@ -1,5 +1,6 @@
 // @ts-nocheck
 'use client';
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share } from 'lucide-react';
 import { db } from '@/lib/firebase';
@@ -24,26 +25,7 @@ function InstallBanner({ onDismiss }: { onDismiss: () => void }) {
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
-// --- حط الكود هنا بالظبط يا يوسف ---
-  const filteredCars = (cars || []).filter((car) => {
-    const search = (searchQuery || "").toLowerCase();
-    const carName = (car.name || "").toLowerCase();
-    const carBrand = (car.brand || "").toLowerCase();
 
-    const translations: { [key: string]: string } = {
-      'بي ام': 'bmw',
-      'مرسيدس': 'mercedes',
-      'بورشه': 'porsche',
-      'تويوتا': 'toyota'
-    };
-
-    const matchesDirect = carName.includes(search) || carBrand.includes(search);
-    const matchesArabic = Object.keys(translations).some(key => 
-      search.includes(key) && (carName.includes(translations[key]) || carBrand.includes(translations[key]))
-    );
-
-    return matchesDirect || matchesArabic;
-  });
   const handleAndroidInstall = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -142,7 +124,22 @@ export default function Home() {
   const fleetRef  = useRef<HTMLDivElement>(null);
   const myWhatsAppNumber = "201095976766";
 
-  
+  const displayCars = (cars || []).filter((car) => {
+    const search = (searchQuery || "").toLowerCase();
+    const carName = (car.name || "").toLowerCase();
+    const carBrand = (car.brand || "").toLowerCase();
+
+    const translations: { [key: string]: string } = {
+      'بي ام': 'bmw', 'مرسيدس': 'mercedes', 'بورشه': 'porsche', 'تويوتا': 'toyota'
+    };
+
+    const matchesDirect = carName.includes(search) || carBrand.includes(search);
+    const matchesArabic = Object.keys(translations).some(key => 
+      search.includes(key) && (carName.includes(translations[key]) || carBrand.includes(translations[key]))
+    );
+
+    return matchesDirect || matchesArabic;
+  });
   /* ── scroll + outside-click ── */
   useEffect(() => {
     setMounted(true);
@@ -243,15 +240,21 @@ export default function Home() {
     <main className="relative min-h-screen text-[#1a1a1a] overflow-x-hidden font-sans selection:bg-black selection:text-white">
 
       {/* ── Background ── */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <img
-          src="/f30-refined.jpg" alt=""
-          className="w-full h-full object-cover"
-          style={{ filter: `blur(${blurAmount}px)`, transition: 'filter 0.08s linear', transform: 'scale(1.05)' }}
-        />
-        <div className="absolute inset-0 bg-black/30" />
-      </div>
-
+     <div className="fixed inset-0 z-0 pointer-events-none">
+  <Image
+    src="/f30-refined.jpg"
+    alt="BMW F30 Background"
+    fill
+    priority
+    className="object-cover"
+    style={{ 
+       filter: `blur(${blurAmount}px)`, 
+       transition: 'filter 0.08s linear',
+       transform: 'scale(1.05)' 
+    }}
+  />
+  <div className="absolute inset-0 bg-black/30" />
+</div>
       {/* ── PWA Install Banner ── */}
       {showInstallBanner && <InstallBanner onDismiss={dismissBanner} />}
 
@@ -339,9 +342,9 @@ export default function Home() {
                 </div>
               ))}
             </div>
-         ) : filteredCars.length > 0 ? (
+         ) : displayCars.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
-            {filteredCars.map((car, index) => (
+            {displayCars.map((car, index) => (
               <CarCard 
                 key={car.id} 
                 car={car} 
@@ -383,13 +386,15 @@ export default function Home() {
 
             {/* Image panel */}
             <div className="relative bg-zinc-900 flex-shrink-0 h-[45vw] min-h-[220px] max-h-[320px] md:h-auto md:w-3/5 md:max-h-[92vh]">
-              <img
-                src={selectedCar.images[currentImageIndex]}
-                className="w-full h-full object-cover cursor-zoom-in transition-opacity duration-500"
-                alt={selectedCar.name}
-                fetchPriority="high"
-                onClick={() => setZoomedImage(selectedCar.images[currentImageIndex])}
-              />
+              <Image
+  src={selectedCar.images[currentImageIndex]}
+  alt={selectedCar.name}
+  fill
+  priority
+  className="w-full h-full object-cover cursor-zoom-in transition-opacity duration-500"
+  sizes="(max-width: 768px) 100vw, 60vw"
+  onClick={() => setZoomedImage(selectedCar.images[currentImageIndex])} // حافظنا على الزوم هنا
+/>
               <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm text-white rounded-full px-3 py-1 flex items-center gap-1.5 pointer-events-none">
                 <ZoomIn size={11} />
                 <span className="text-[8px] tracking-widest"> </span>
