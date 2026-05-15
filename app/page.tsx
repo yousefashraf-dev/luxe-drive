@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, updateDoc, doc, increment } from 'firebase/firestore';
-
+import { SpeedInsights } from "@vercel/speed-insights/next";
 /* ─── helper: detect iOS / Android ─── */
 function getOS(): 'ios' | 'android' | 'other' {
   if (typeof navigator === 'undefined') return 'other';
