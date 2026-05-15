@@ -1,10 +1,108 @@
 // @ts-nocheck
 'use client';
 import { useState, useEffect, useRef } from 'react';
-import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn } from 'lucide-react';
+import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, updateDoc, doc, increment } from 'firebase/firestore';
 
+/* ─── helper: detect iOS / Android ─── */
+function getOS(): 'ios' | 'android' | 'other' {
+  if (typeof navigator === 'undefined') return 'other';
+  const ua = navigator.userAgent;
+  if (/iPad|iPhone|iPod/.test(ua)) return 'ios';
+  if (/Android/.test(ua)) return 'android';
+  return 'other';
+}
+
+/* ─── PWA Install Banner ─── */
+function InstallBanner({ onDismiss }: { onDismiss: () => void }) {
+  const os = getOS();
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+
+  useEffect(() => {
+    const handler = (e: any) => { e.preventDefault(); setDeferredPrompt(e); };
+    window.addEventListener('beforeinstallprompt', handler);
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleAndroidInstall = async () => {
+    if (deferredPrompt) {
+      deferredPrompt.prompt();
+      await deferredPrompt.userChoice;
+    }
+    onDismiss();
+  };
+
+  /* iOS: show steps */
+  if (os === 'ios') {
+    return (
+      <div className="fixed bottom-5 left-4 right-4 z-[400] animate-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-5 shadow-2xl">
+          <button onClick={onDismiss} className="absolute top-4 right-4 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center group">
+            <X size={13} className="text-white/60 group-hover:text-white transition-colors" />
+          </button>
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-2xl bg-[#c5a059]/20 flex items-center justify-center">
+              <Share size={18} className="text-[#c5a059]" />
+            </div>
+            <div>
+              <p className="text-white text-sm font-bold">أضف ZaFah لشاشتك</p>
+              <p className="text-white/40 text-[10px] tracking-wider uppercase">تجربة تطبيق كاملة</p>
+            </div>
+          </div>
+          <div className="space-y-2.5 text-right" dir="rtl">
+            <div className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3">
+              <span className="text-white/40 text-[11px] font-bold">١</span>
+              <p className="text-white/70 text-[12px]">اضغط زرار <span className="text-[#c5a059] font-bold">Share</span> في أسفل المتصفح</p>
+            </div>
+            <div className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3">
+              <span className="text-white/40 text-[11px] font-bold">٢</span>
+              <p className="text-white/70 text-[12px]">اختار <span className="text-[#c5a059] font-bold">"Add to Home Screen"</span></p>
+            </div>
+            <div className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3">
+              <span className="text-white/40 text-[11px] font-bold">٣</span>
+              <p className="text-white/70 text-[12px]">اضغط <span className="text-[#c5a059] font-bold">"Add"</span> وهيظهر زي أي تطبيق</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* Android: one-tap install */
+  if (os === 'android') {
+    return (
+      <div className="fixed bottom-5 left-4 right-4 z-[400] animate-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-[#0a0a0a] border border-white/10 rounded-3xl p-5 shadow-2xl flex items-center gap-4">
+          <div className="w-10 h-10 rounded-2xl bg-[#c5a059]/20 flex items-center justify-center flex-shrink-0">
+            <Download size={18} className="text-[#c5a059]" />
+          </div>
+          <div className="flex-1 text-right" dir="rtl">
+            <p className="text-white text-sm font-bold">ثبّت تطبيق ZaFah</p>
+            <p className="text-white/50 text-[11px]">أسرع وشغّال حتى بدون نت</p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={handleAndroidInstall}
+              className="bg-[#c5a059] text-black text-[10px] font-black uppercase tracking-wider px-4 py-2.5 rounded-2xl active:scale-95 transition-all"
+            >
+              ثبّت
+            </button>
+            <button onClick={onDismiss} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+              <X size={13} className="text-white/60" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return null; // desktop → لا رسالة
+}
+
+/* ════════════════════════════════════════
+   MAIN PAGE
+════════════════════════════════════════ */
 export default function Home() {
   const [cars, setCars]                 = useState<any[]>([]);
   const [filteredCars, setFilteredCars] = useState<any[]>([]);
@@ -18,6 +116,7 @@ export default function Home() {
   const [mounted, setMounted]           = useState(false);
   const [zoomedImage, setZoomedImage]   = useState<string | null>(null);
   const [isClosing, setIsClosing]       = useState(false);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   const searchRef = useRef<HTMLDivElement>(null);
   const fleetRef  = useRef<HTMLDivElement>(null);
@@ -39,10 +138,32 @@ export default function Home() {
     };
   }, []);
 
+  /* ── PWA banner: show once per week on mobile ── */
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const os = getOS();
+    if (os === 'other') return; // desktop → skip
+
+    // لو فعلاً شغال كـ PWA (standalone) → متعرضش
+    if (window.matchMedia('(display-mode: standalone)').matches) return;
+
+    const lastShown = localStorage.getItem('pwa_banner_ts');
+    const ONE_WEEK  = 7 * 24 * 60 * 60 * 1000;
+    if (!lastShown || Date.now() - Number(lastShown) > ONE_WEEK) {
+      // أظهر بعد 4 ثواني عشان الصفحة تكون اتحملت
+      const t = setTimeout(() => setShowInstallBanner(true), 4000);
+      return () => clearTimeout(t);
+    }
+  }, []);
+
+  const dismissBanner = () => {
+    setShowInstallBanner(false);
+    localStorage.setItem('pwa_banner_ts', String(Date.now()));
+  };
+
   /* ── Firebase + localStorage cache (5-min TTL) ── */
   useEffect(() => {
     const fetchCars = async () => {
-      // 1) instant render from cache
       try {
         const raw = localStorage.getItem('luxe_cars_cache');
         if (raw) {
@@ -55,7 +176,6 @@ export default function Home() {
         }
       } catch (_) {}
 
-      // 2) fetch from Firebase
       try {
         const snap = await getDocs(collection(db, "cars"));
         const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -111,6 +231,9 @@ export default function Home() {
         <div className="absolute inset-0 bg-black/30" />
       </div>
 
+      {/* ── PWA Install Banner ── */}
+      {showInstallBanner && <InstallBanner onDismiss={dismissBanner} />}
+
       {/* ── Admin button ── */}
       <div className="fixed top-28 right-6 z-[110]">
         <a href="/admin" className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center shadow-2xl hover:scale-110 transition-all duration-500 border border-white/20">
@@ -121,7 +244,6 @@ export default function Home() {
       {/* ════ NAV ════ */}
       <nav className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a] text-white px-6 md:px-12 py-5 flex justify-between items-center border-b border-white/5 shadow-2xl">
 
-        {/* Logo */}
         <div className="flex-1 flex flex-col items-start cursor-default group">
           <div className="relative">
             <span className="font-serif text-2xl font-bold text-white tracking-tight transition-all duration-700 group-hover:text-[#c5a059]">ZaFah</span>
@@ -130,7 +252,6 @@ export default function Home() {
           <span className="text-[7px] tracking-[0.7em] text-zinc-500 uppercase mt-1.5">Luxury Rental</span>
         </div>
 
-        {/* Search */}
         <div ref={searchRef} className="flex-[1.5] max-w-sm hidden md:flex flex-col relative mx-4">
           <div className="relative flex items-center w-full">
             <Search size={14} className="absolute left-4 text-zinc-400" />
@@ -199,7 +320,9 @@ export default function Home() {
             </div>
           ) : filteredCars.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
-              {filteredCars.map(car => <CarCard key={car.id} car={car} onClick={() => handleSelectCar(car)} />)}
+              {filteredCars.map((car, index) => (
+                <CarCard key={car.id} car={car} index={index} onClick={() => handleSelectCar(car)} />
+              ))}
             </div>
           ) : (
             <p className="py-20 text-center text-white/40 font-serif italic">No vehicles matching your search found.</p>
@@ -207,10 +330,7 @@ export default function Home() {
         </section>
       </div>
 
-      {/* ════ MODAL ════
-           Mobile  : full-screen bottom-sheet, image top, info scrollable below
-           Desktop : side-by-side centered box
-      */}
+      {/* ════ MODAL ════ */}
       {selectedCar && (
         <div
           className={`fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/70 backdrop-blur-md transition-all duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`}
@@ -224,7 +344,7 @@ export default function Home() {
             ${isClosing ? 'translate-y-4 opacity-0' : 'translate-y-0 opacity-100'}
           `}>
 
-            {/* ── X button — always on top-right ── */}
+            {/* X button */}
             <button
               onClick={handleCloseModal}
               aria-label="Close"
@@ -233,22 +353,19 @@ export default function Home() {
               <X size={16} className="transition-transform duration-500 group-hover:rotate-90" />
             </button>
 
-            {/* ── Image panel ── */}
+            {/* Image panel */}
             <div className="relative bg-zinc-900 flex-shrink-0 h-[45vw] min-h-[220px] max-h-[320px] md:h-auto md:w-3/5 md:max-h-[92vh]">
               <img
                 src={selectedCar.images[currentImageIndex]}
                 className="w-full h-full object-cover cursor-zoom-in transition-opacity duration-500"
                 alt={selectedCar.name}
+                fetchPriority="high"
                 onClick={() => setZoomedImage(selectedCar.images[currentImageIndex])}
               />
-
-              {/* Zoom hint */}
               <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm text-white rounded-full px-3 py-1 flex items-center gap-1.5 pointer-events-none">
                 <ZoomIn size={11} />
                 <span className="text-[8px] tracking-widest">اضغط للتكبير</span>
               </div>
-
-              {/* Arrows */}
               {selectedCar.images.length > 1 && (
                 <div className="absolute inset-0 flex items-center justify-between px-3 pointer-events-none">
                   <button className="pointer-events-auto w-10 h-10 bg-black/40 backdrop-blur-md rounded-full text-white flex items-center justify-center border border-white/20 active:scale-90 transition-all"
@@ -261,8 +378,6 @@ export default function Home() {
                   </button>
                 </div>
               )}
-
-              {/* Dots */}
               {selectedCar.images.length > 1 && (
                 <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 pointer-events-none">
                   {selectedCar.images.map((_: any, i: number) => (
@@ -272,12 +387,11 @@ export default function Home() {
               )}
             </div>
 
-            {/* ── Info panel ── */}
+            {/* Info panel */}
             <div
               className="flex-1 bg-[#F5F4F1] flex flex-col overflow-y-auto px-5 pt-5 pb-6 md:w-2/5 md:px-10 md:pt-10 md:pb-10"
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
-              {/* Name — pr-12 on mobile so it clears the X button */}
               <div className="text-right mb-1 pr-12 md:pr-0">
                 <h2 className="font-serif text-3xl md:text-5xl font-light italic text-black leading-tight"
                   style={{ fontFamily: "'Playfair Display',Georgia,serif" }}>
@@ -287,7 +401,6 @@ export default function Home() {
                 <p className="text-[8px] text-zinc-400 uppercase tracking-[4px] mt-2 font-bold">Premium Class</p>
               </div>
 
-              {/* Description */}
               {selectedCar.description && (
                 <p className="text-zinc-500 text-sm leading-relaxed text-right font-light italic mt-4 md:mt-6" dir="rtl">
                   {selectedCar.description}
@@ -315,7 +428,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* CTA buttons */}
               <div className="mt-5 flex gap-3">
                 <a href={`https://wa.me/${selectedCar.phone || myWhatsAppNumber}`} target="_blank"
                   className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] text-white py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[2px] shadow-lg active:scale-95 transition-all">
@@ -377,8 +489,10 @@ export default function Home() {
 
 /* ════════════════════════════════════
    CAR CARD — Floating Luxury
+   index prop → أول 3 صور تتحمل eager
 ════════════════════════════════════ */
-function CarCard({ car, onClick }: { car: any; onClick?: () => void }) {
+function CarCard({ car, index = 0, onClick }: { car: any; index?: number; onClick?: () => void }) {
+  const isEager = index < 3;
   return (
     <div className="group relative cursor-pointer" onClick={onClick}>
       <div className="absolute -inset-1 rounded-[2rem] bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none" />
@@ -387,8 +501,11 @@ function CarCard({ car, onClick }: { car: any; onClick?: () => void }) {
         <div className="relative h-[58vw] md:h-72 overflow-hidden">
           <img
             src={Array.isArray(car.image) ? car.image[0] : car.image}
+            alt={car.name}
+            loading={isEager ? "eager" : "lazy"}
+            fetchPriority={index === 0 ? "high" : isEager ? "auto" : "low"}
+            decoding="async"
             className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-105"
-            alt={car.name} loading="lazy"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
 
