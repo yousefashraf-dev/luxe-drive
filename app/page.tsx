@@ -5,7 +5,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, updateDoc, doc, increment } from 'firebase/firestore';
-import { SpeedInsights } from "@vercel/speed-insights/next";
+
 /* ─── helper: detect iOS / Android ─── */
 function getOS(): 'ios' | 'android' | 'other' {
   if (typeof navigator === 'undefined') return 'other';
@@ -34,7 +34,6 @@ function InstallBanner({ onDismiss }: { onDismiss: () => void }) {
     onDismiss();
   };
 
-  /* iOS: show steps */
   if (os === 'ios') {
     return (
       <div className="fixed bottom-5 left-4 right-4 z-[400] animate-in slide-in-from-bottom-4 duration-500">
@@ -70,7 +69,6 @@ function InstallBanner({ onDismiss }: { onDismiss: () => void }) {
     );
   }
 
-  /* Android: one-tap install */
   if (os === 'android') {
     return (
       <div className="fixed bottom-5 left-4 right-4 z-[400] animate-in slide-in-from-bottom-4 duration-500">
@@ -98,7 +96,7 @@ function InstallBanner({ onDismiss }: { onDismiss: () => void }) {
     );
   }
 
-  return null; // desktop → لا رسالة
+  return null;
 }
 
 /* ════════════════════════════════════════
@@ -118,33 +116,32 @@ export default function Home() {
   const [zoomedImage, setZoomedImage]   = useState<string | null>(null);
   const [isClosing, setIsClosing]       = useState(false);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
-  
 
   const searchRef = useRef<HTMLDivElement>(null);
   const fleetRef  = useRef<HTMLDivElement>(null);
   const myWhatsAppNumber = "201095976766";
 
+  /* ── Arabic search + direct filter ── */
   const displayCars = (cars || []).filter((car) => {
     const search = (searchQuery || "").toLowerCase();
-    const carName = (car.name || "").toLowerCase();
+    if (!search) return true;
+    const carName  = (car.name  || "").toLowerCase();
     const carBrand = (car.brand || "").toLowerCase();
-
     const translations: { [key: string]: string } = {
       'بي ام': 'bmw', 'مرسيدس': 'mercedes', 'بورشه': 'porsche', 'تويوتا': 'toyota'
     };
-
     const matchesDirect = carName.includes(search) || carBrand.includes(search);
-    const matchesArabic = Object.keys(translations).some(key => 
-      search.includes(key) && (carName.includes(translations[key]) || carBrand.includes(translations[key]))
+    const matchesArabic = Object.keys(translations).some(
+      key => search.includes(key) && (carName.includes(translations[key]) || carBrand.includes(translations[key]))
     );
-
     return matchesDirect || matchesArabic;
   });
+
   /* ── scroll + outside-click ── */
   useEffect(() => {
     setMounted(true);
-    const onScroll = () => setScrollY(window.scrollY);
-    const onOutside = (e: MouseEvent) => {
+    const onScroll   = () => setScrollY(window.scrollY);
+    const onOutside  = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node))
         setShowSuggestions(false);
     };
@@ -156,19 +153,15 @@ export default function Home() {
     };
   }, []);
 
-  /* ── PWA banner: show once per week on mobile ── */
+  /* ── PWA banner: once per week on mobile only ── */
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const os = getOS();
-    if (os === 'other') return; // desktop → skip
-
-    // لو فعلاً شغال كـ PWA (standalone) → متعرضش
+    if (os === 'other') return;
     if (window.matchMedia('(display-mode: standalone)').matches) return;
-
     const lastShown = localStorage.getItem('pwa_banner_ts');
     const ONE_WEEK  = 7 * 24 * 60 * 60 * 1000;
     if (!lastShown || Date.now() - Number(lastShown) > ONE_WEEK) {
-      // أظهر بعد 4 ثواني عشان الصفحة تكون اتحملت
       const t = setTimeout(() => setShowInstallBanner(true), 4000);
       return () => clearTimeout(t);
     }
@@ -193,10 +186,9 @@ export default function Home() {
           }
         }
       } catch (_) {}
-
       try {
         const snap = await getDocs(collection(db, "cars"));
-        const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const data  = snap.docs.map(d => ({ id: d.id, ...d.data() }));
         const sorted = [...data].sort((a, b) => (b.isVIP ? 1 : 0) - (a.isVIP ? 1 : 0));
         setCars(sorted); setFilteredCars(sorted); setLoading(false);
         try { localStorage.setItem('luxe_cars_cache', JSON.stringify({ data, ts: Date.now() })); } catch (_) {}
@@ -208,13 +200,13 @@ export default function Home() {
     fetchCars();
   }, []);
 
-  /* ── search filter ── */
+  /* ── search suggestions ── */
   useEffect(() => {
     if (searchQuery.length > 0) {
       const f = cars.filter(c => c?.name?.toLowerCase().includes(searchQuery.toLowerCase()));
-      setSuggestions(f.slice(0, 5)); setShowSuggestions(true); setFilteredCars(f);
+      setSuggestions(f.slice(0, 5)); setShowSuggestions(true);
     } else {
-      setSuggestions([]); setShowSuggestions(false); setFilteredCars(cars);
+      setSuggestions([]); setShowSuggestions(false);
     }
   }, [searchQuery, cars]);
 
@@ -239,22 +231,23 @@ export default function Home() {
   return (
     <main className="relative min-h-screen text-[#1a1a1a] overflow-x-hidden font-sans selection:bg-black selection:text-white">
 
-      {/* ── Background ── */}
-     <div className="fixed inset-0 z-0 pointer-events-none">
-  <Image
-    src="/f30-refined.jpg"
-    alt="BMW F30 Background"
-    fill
-    priority
-    className="object-cover"
-    style={{ 
-       filter: `blur(${blurAmount}px)`, 
-       transition: 'filter 0.08s linear',
-       transform: 'scale(1.05)' 
-    }}
-  />
-  <div className="absolute inset-0 bg-black/30" />
-</div>
+      {/* ── Background — fixed, blurs on scroll ── */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <Image
+          src="/f30-refined.jpg"
+          alt="BMW F30 Background"
+          fill
+          priority
+          className="object-cover"
+          style={{
+            filter: `blur(${blurAmount}px)`,
+            transition: 'filter 0.08s linear',
+            transform: 'scale(1.05)',
+          }}
+        />
+        <div className="absolute inset-0 bg-black/30" />
+      </div>
+
       {/* ── PWA Install Banner ── */}
       {showInstallBanner && <InstallBanner onDismiss={dismissBanner} />}
 
@@ -342,40 +335,39 @@ export default function Home() {
                 </div>
               ))}
             </div>
-         ) : displayCars.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
-            {displayCars.map((car, index) => (
-              <CarCard 
-                key={car.id} 
-                car={car} 
-                index={index} 
-                onClick={() => handleSelectCar(car)} 
-              />
-            ))}
-          </div>
-        ) : (
-          <p className="py-20 text-center text-white/40 font-serif italic">
-            No vehicles matching your search found.
-          </p>
-        )}
+          ) : displayCars.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
+              {displayCars.map((car, index) => (
+                <CarCard key={car.id} car={car} index={index} onClick={() => handleSelectCar(car)} />
+              ))}
+            </div>
+          ) : (
+            <p className="py-20 text-center text-white/40 font-serif italic">No vehicles matching your search found.</p>
+          )}
         </section>
       </div>
 
-      {/* ════ MODAL ════ */}
+      {/* ════════════════════════════════════════════
+           MODAL
+           Mobile  : bottom-sheet, rounded top corners, NOT full screen
+           Desktop : centered side-by-side box
+      ════════════════════════════════════════════ */}
       {selectedCar && (
         <div
           className={`fixed inset-0 z-[200] flex items-end md:items-center justify-center bg-black/70 backdrop-blur-md transition-all duration-300 ${isClosing ? 'opacity-0' : 'opacity-100'}`}
           onClick={e => { if (e.target === e.currentTarget) handleCloseModal(); }}
         >
           <div className={`
-            relative w-full bg-white shadow-2xl
-            flex flex-col h-[100dvh]
-            md:flex-row md:h-auto md:max-h-[92vh] md:max-w-6xl md:rounded-[2.5rem] md:overflow-hidden
+            relative w-full bg-white shadow-2xl overflow-hidden
+            /* ── Mobile: bottom-sheet, max 92% height, rounded top ── */
+            flex flex-col rounded-t-[2rem] max-h-[92dvh]
+            /* ── Desktop: centered box, side-by-side ── */
+            md:flex-row md:rounded-[2.5rem] md:max-h-[88vh] md:max-w-6xl md:w-full
             transition-all duration-300
-            ${isClosing ? 'translate-y-4 opacity-0' : 'translate-y-0 opacity-100'}
+            ${isClosing ? 'translate-y-6 opacity-0' : 'translate-y-0 opacity-100'}
           `}>
 
-            {/* X button */}
+            {/* ── X button ── */}
             <button
               onClick={handleCloseModal}
               aria-label="Close"
@@ -384,21 +376,23 @@ export default function Home() {
               <X size={16} className="transition-transform duration-500 group-hover:rotate-90" />
             </button>
 
-            {/* Image panel */}
-            <div className="relative bg-zinc-900 flex-shrink-0 h-[45vw] min-h-[220px] max-h-[320px] md:h-auto md:w-3/5 md:max-h-[92vh]">
-              <Image
-  src={selectedCar.images[currentImageIndex]}
-  alt={selectedCar.name}
-  fill
-  priority
-  className="w-full h-full object-cover cursor-zoom-in transition-opacity duration-500"
-  sizes="(max-width: 768px) 100vw, 60vw"
-  onClick={() => setZoomedImage(selectedCar.images[currentImageIndex])} // حافظنا على الزوم هنا
-/>
+            {/* ── Image panel ── */}
+            <div className="relative bg-zinc-900 flex-shrink-0 h-[48vw] min-h-[200px] max-h-[280px] md:h-auto md:w-3/5 md:max-h-[88vh]">
+              {/* صورة الموبايل والديسكتوب */}
+              <img
+                src={selectedCar.images[currentImageIndex]}
+                alt={selectedCar.name}
+                className="w-full h-full object-cover cursor-zoom-in transition-opacity duration-500"
+                onClick={() => setZoomedImage(selectedCar.images[currentImageIndex])}
+              />
+
+              {/* Zoom hint */}
               <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm text-white rounded-full px-3 py-1 flex items-center gap-1.5 pointer-events-none">
                 <ZoomIn size={11} />
-                <span className="text-[8px] tracking-widest"> </span>
+                <span className="text-[8px] tracking-widest">اضغط للتكبير</span>
               </div>
+
+              {/* Arrows */}
               {selectedCar.images.length > 1 && (
                 <div className="absolute inset-0 flex items-center justify-between px-3 pointer-events-none">
                   <button className="pointer-events-auto w-10 h-10 bg-black/40 backdrop-blur-md rounded-full text-white flex items-center justify-center border border-white/20 active:scale-90 transition-all"
@@ -411,6 +405,8 @@ export default function Home() {
                   </button>
                 </div>
               )}
+
+              {/* Dots */}
               {selectedCar.images.length > 1 && (
                 <div className="absolute bottom-3 left-0 right-0 flex justify-center gap-1.5 pointer-events-none">
                   {selectedCar.images.map((_: any, i: number) => (
@@ -420,22 +416,28 @@ export default function Home() {
               )}
             </div>
 
-            {/* Info panel */}
+            {/* ── Info panel ── */}
             <div
               className="flex-1 bg-[#F5F4F1] flex flex-col overflow-y-auto px-5 pt-5 pb-6 md:w-2/5 md:px-10 md:pt-10 md:pb-10"
               style={{ WebkitOverflowScrolling: 'touch' }}
             >
+              {/* Car name */}
               <div className="text-right mb-1 pr-12 md:pr-0">
-               <h2 className="text-left text-3xl md:text-4xl font-serif font-bold text-black leading-tight mb-2 tracking-tight">
-  {selectedCar.name}
-</h2>
+                <h2
+                  className="font-serif text-3xl md:text-5xl font-light italic text-black leading-tight"
+                  style={{ fontFamily: "'Playfair Display',Georgia,serif" }}
+                >
+                  {selectedCar.name}
+                </h2>
+                <div className="h-[1px] w-14 bg-black/30 mt-3 ml-auto" />
                 <p className="text-[8px] text-zinc-400 uppercase tracking-[4px] mt-2 font-bold">Premium Class</p>
               </div>
 
+              {/* Description */}
               {selectedCar.description && (
-              <p className="text-lg md:text-xl font-semibold text-slate-800 leading-relaxed text-right mt-6 pr-4 border-r-2 border-black tracking-wide">
-  {selectedCar.description}
-</p>
+                <p className="text-zinc-500 text-sm leading-relaxed text-right font-light italic mt-4 md:mt-6 border-r-2 border-zinc-200 pr-4" dir="rtl">
+                  {selectedCar.description}
+                </p>
               )}
 
               {/* Calendar */}
@@ -459,6 +461,7 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* CTA buttons */}
               <div className="mt-5 flex gap-3">
                 <a href={`https://wa.me/${selectedCar.phone || myWhatsAppNumber}`} target="_blank"
                   className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] text-white py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[2px] shadow-lg active:scale-95 transition-all">
@@ -501,7 +504,7 @@ export default function Home() {
           <div className="flex items-center gap-4 group">
             <div className="h-[1px] w-12 bg-white/20 group-hover:w-20 transition-all duration-700" />
             <p className="font-serif italic text-lg text-zinc-400">
-              Developed by <span className="text-white font-bold ml-1">usf.dev</span>
+              Developed by <span className="text-white font-bold ml-1">usf</span>
             </p>
           </div>
         </div>
@@ -520,7 +523,7 @@ export default function Home() {
 
 /* ════════════════════════════════════
    CAR CARD — Floating Luxury
-   index prop → أول 3 صور تتحمل eager
+   index → أول 3 صور eager، الباقي lazy
 ════════════════════════════════════ */
 function CarCard({ car, index = 0, onClick }: { car: any; index?: number; onClick?: () => void }) {
   const isEager = index < 3;
