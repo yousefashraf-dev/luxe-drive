@@ -332,7 +332,7 @@ export default function AdminDashboard() {
                 </div>
                 
                 <CldUploadWidget 
-                  uploadPreset="f5rmm3b8" 
+                  uploadPreset="ml_default" 
                   onSuccess={(res) => setFormData(p => ({...p, image: [...p.image, res.info.secure_url]}))}
                 >
                   {({ open }) => (
