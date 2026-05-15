@@ -24,7 +24,26 @@ function InstallBanner({ onDismiss }: { onDismiss: () => void }) {
     window.addEventListener('beforeinstallprompt', handler);
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
+// --- حط الكود هنا بالظبط يا يوسف ---
+  const filteredCars = (cars || []).filter((car) => {
+    const search = (searchQuery || "").toLowerCase();
+    const carName = (car.name || "").toLowerCase();
+    const carBrand = (car.brand || "").toLowerCase();
 
+    const translations: { [key: string]: string } = {
+      'بي ام': 'bmw',
+      'مرسيدس': 'mercedes',
+      'بورشه': 'porsche',
+      'تويوتا': 'toyota'
+    };
+
+    const matchesDirect = carName.includes(search) || carBrand.includes(search);
+    const matchesArabic = Object.keys(translations).some(key => 
+      search.includes(key) && (carName.includes(translations[key]) || carBrand.includes(translations[key]))
+    );
+
+    return matchesDirect || matchesArabic;
+  });
   const handleAndroidInstall = async () => {
     if (deferredPrompt) {
       deferredPrompt.prompt();
@@ -117,11 +136,13 @@ export default function Home() {
   const [zoomedImage, setZoomedImage]   = useState<string | null>(null);
   const [isClosing, setIsClosing]       = useState(false);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  
 
   const searchRef = useRef<HTMLDivElement>(null);
   const fleetRef  = useRef<HTMLDivElement>(null);
   const myWhatsAppNumber = "201095976766";
 
+  
   /* ── scroll + outside-click ── */
   useEffect(() => {
     setMounted(true);
@@ -318,15 +339,22 @@ export default function Home() {
                 </div>
               ))}
             </div>
-          ) : filteredCars.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
-              {filteredCars.map((car, index) => (
-                <CarCard key={car.id} car={car} index={index} onClick={() => handleSelectCar(car)} />
-              ))}
-            </div>
-          ) : (
-            <p className="py-20 text-center text-white/40 font-serif italic">No vehicles matching your search found.</p>
-          )}
+         ) : filteredCars.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
+            {filteredCars.map((car, index) => (
+              <CarCard 
+                key={car.id} 
+                car={car} 
+                index={index} 
+                onClick={() => handleSelectCar(car)} 
+              />
+            ))}
+          </div>
+        ) : (
+          <p className="py-20 text-center text-white/40 font-serif italic">
+            No vehicles matching your search found.
+          </p>
+        )}
         </section>
       </div>
 
