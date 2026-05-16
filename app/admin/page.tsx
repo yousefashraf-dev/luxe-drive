@@ -298,10 +298,13 @@ export default function AdminDashboard() {
     <input 
       required 
       className="w-full border-none p-4 pr-4 pl-12 rounded-2xl bg-gray-50 outline-none focus:ring-2 focus:ring-black transition-all text-right"
-      placeholder="مثلاً: 201095976766" 
-      value={formData.phone}
-      onChange={(e) => setFormData({...formData, phone: e.target.value})}
-    />
+placeholder="010xxxxxxxx :مثلاً"
+     value={formData.phone || ''}
+onChange={(e) => {
+  let val = e.target.value.replace(/\D/g, ''); // أرقام بس
+  if (val.startsWith('0')) val = '20' + val.slice(1); // 010 → 2010
+  setFormData({...formData, phone: val});
+}}    />
   </div>
 </div>
 

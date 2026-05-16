@@ -166,33 +166,43 @@ export default function Home() {
 
   /* ── Firebase + localStorage cache ── */
   useEffect(() => {
+    const sortFn = (a: any, b: any) => {
+      const aVIP = a.isVIP === true || a.isVIP === 'true' ? 1 : 0;
+      const bVIP = b.isVIP === true || b.isVIP === 'true' ? 1 : 0;
+      return bVIP - aVIP;
+    };
+
+    const fetchFromFirebase = async (updateCache = true) => {
+      try {
+        const snap   = await getDocs(collection(db, "cars"));
+        const data   = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        const sorted = [...data].sort(sortFn);
+        setCars(sorted); setFilteredCars(sorted); setLoading(false);
+        if (updateCache) {
+          try { localStorage.setItem('luxe_cars_cache', JSON.stringify({ data, ts: Date.now() })); } catch (_) {}
+        }
+      } catch (err) { console.error("Firebase:", err); setLoading(false); }
+    };
+
     const fetchCars = async () => {
+      // 1) show cache instantly
       try {
         const raw = localStorage.getItem('luxe_cars_cache');
         if (raw) {
           const { data, ts } = JSON.parse(raw);
           if (Date.now() - ts < 5 * 60 * 1000) {
-            const sorted = [...data].sort((a, b) => {
-              const aVIP = a.isVIP === true || a.isVIP === 'true' ? 1 : 0;
-              const bVIP = b.isVIP === true || b.isVIP === 'true' ? 1 : 0;
-              return bVIP - aVIP;
-            });
-            setCars(sorted); setFilteredCars(sorted); setLoading(false); return;
+            const sorted = [...data].sort(sortFn);
+            setCars(sorted); setFilteredCars(sorted); setLoading(false);
+            // refresh silently in background
+            fetchFromFirebase(true);
+            return;
           }
         }
       } catch (_) {}
-      try {
-        const snap   = await getDocs(collection(db, "cars"));
-        const data   = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const sorted = [...data].sort((a, b) => {
-          const aVIP = a.isVIP === true || a.isVIP === 'true' ? 1 : 0;
-          const bVIP = b.isVIP === true || b.isVIP === 'true' ? 1 : 0;
-          return bVIP - aVIP;
-        });
-        setCars(sorted); setFilteredCars(sorted); setLoading(false);
-        try { localStorage.setItem('luxe_cars_cache', JSON.stringify({ data, ts: Date.now() })); } catch (_) {}
-      } catch (err) { console.error("Firebase:", err); setLoading(false); }
+      // 2) no valid cache → fetch directly
+      await fetchFromFirebase(true);
     };
+
     fetchCars();
   }, []);
 
@@ -225,7 +235,6 @@ export default function Home() {
 
   const blurAmount    = Math.max(4, 18 - (scrollY / 500) * 14);
   const headerOpacity = Math.max(0, 1 - scrollY / 600);
-  const daysOfWeek    = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
   return (
     <main className="relative min-h-screen text-[#1a1a1a] overflow-x-hidden font-sans selection:bg-black selection:text-white">
@@ -310,7 +319,7 @@ export default function Home() {
 
         {/* Fleet */}
         <section ref={fleetRef} className="max-w-7xl mx-auto px-4 md:px-6 pb-40">
-          {loading ? (
+          {(loading || (cars.length === 0 && !searchQuery)) ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
               {[1,2,3].map(i => (
                 <div key={i} className="rounded-[2rem] overflow-hidden border border-white/10 bg-white/10 backdrop-blur-md animate-pulse">
@@ -370,7 +379,7 @@ export default function Home() {
               />
               <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm text-white rounded-full px-3 py-1 flex items-center gap-1.5 pointer-events-none">
                 <ZoomIn size={11} />
-                <span className="text-[8px] tracking-widest">اضغط للتكبير</span>
+                <span className="text-[8px] tracking-widest"> </span>
               </div>
               {selectedCar.images.length > 1 && (
                 <div className="absolute inset-0 flex items-center justify-between px-3 pointer-events-none">
@@ -433,26 +442,70 @@ export default function Home() {
                 </p>
               )}
 
-              {/* Calendar */}
-              <div className="mt-5 bg-white rounded-[1.2rem] border border-zinc-200 shadow-sm p-4 md:p-6">
-                <p className="text-[8px] font-black uppercase tracking-[5px] text-center text-zinc-400 mb-1">Availability Schedule</p>
-                <p className="text-[10px] text-center text-red-500 font-medium mb-4" dir="rtl">🔴 الأيام الحمراء محجوزة مسبقاً</p>
-                <div className="grid grid-cols-7 gap-1 mb-2">
-                  {daysOfWeek.map(d => <div key={d} className="text-[7px] font-black uppercase text-zinc-300 text-center">{d}</div>)}
-                </div>
-                <div className="grid grid-cols-7 gap-1 text-center">
-                  {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
-                    const booked = selectedCar.bookedDays?.includes(day);
-                    return (
-                      <div key={day} className="flex items-center justify-center">
-                        <span className={`text-[10px] w-7 h-7 flex items-center justify-center rounded-full font-medium transition-all duration-200 ${booked ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.4)]' : 'text-zinc-400'}`}>
-                          {day}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              {/* ── Smart Calendar ── */}
+              {(() => {
+                const now        = new Date();
+                const year       = now.getFullYear();
+                const month      = now.getMonth(); // 0-indexed
+                const today      = now.getDate();
+                const firstDay   = new Date(year, month, 1).getDay(); // 0=Sun
+                const daysInMonth = new Date(year, month + 1, 0).getDate();
+                const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+                // خلايا فاضية قبل أول يوم في الشهر
+                const blanks = Array.from({ length: firstDay });
+                const days   = Array.from({ length: daysInMonth }, (_, i) => i + 1);
+
+                return (
+                  <div className="mt-5 bg-white rounded-[1.2rem] border border-zinc-200 shadow-sm p-4 md:p-6">
+                    {/* Header */}
+                    <p className="text-[8px] font-black uppercase tracking-[5px] text-center text-zinc-400 mb-1">
+                      Availability Schedule
+                    </p>
+                    {/* Month + Year */}
+                    <p className="text-[11px] font-bold text-center text-black mb-1">
+                      {monthNames[month]} {year}
+                    </p>
+                    <p className="text-[10px] text-center text-red-500 font-medium mb-4" dir="rtl">
+                      🔴 الأيام الحمراء محجوزة مسبقاً
+                    </p>
+
+                    {/* Day headers */}
+                    <div className="grid grid-cols-7 gap-1 mb-2">
+                      {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+                        <div key={d} className="text-[7px] font-black uppercase text-zinc-300 text-center">{d}</div>
+                      ))}
+                    </div>
+
+                    {/* Days grid */}
+                    <div className="grid grid-cols-7 gap-1 text-center">
+                      {/* blank cells */}
+                      {blanks.map((_, i) => <div key={`b${i}`} />)}
+
+                      {/* actual days */}
+                      {days.map(day => {
+                        const booked  = selectedCar.bookedDays?.includes(day);
+                        const isToday = day === today;
+                        return (
+                          <div key={day} className="flex items-center justify-center">
+                            <span className={`
+                              text-[10px] w-7 h-7 flex items-center justify-center rounded-full font-medium transition-all duration-200
+                              ${booked
+                                ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.4)]'
+                                : isToday
+                                  ? 'bg-black text-white font-bold'
+                                  : 'text-zinc-400'
+                              }
+                            `}>
+                              {day}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* CTA */}
               <div className="mt-5 flex gap-3">
