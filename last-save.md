@@ -335,3 +335,61 @@ git push origin main
 | `app/add-ad/page.tsx` | **إضافة edit flow كامل** (قراءة URL + pre-fill + updateDoc) |
 | `app/page.tsx` | + optimizeImage + cache stale-while-revalidate |
 | `last-save.md` | توثيق التعديلات |
+
+---
+
+# تحديث 18 مايو 2026 — الدفعة الخامسة (v5.0): خيار سائق/بدون سائق + رفع صور من الموبايل + تسريع التحميل
+
+## أوردر الرفع
+
+```bash
+git add .
+git commit -m "v5.0: driver both option, mobile image upload via API proxy, favorites perf"
+git push origin main
+```
+
+## التعديلات
+
+### 1️⃣ خيار "سائق وبدون سائق" (Driver: both)
+| الملف | التغيير |
+|-------|---------|
+| `app/add-ad/page.tsx` | إضافة زر تالت في Step 2: **سائق وبدون سائق** (`driver: 'both'`) — الـ UI بقى 3 أزرار بـ `grid-cols-3` |
+| `app/add-ad/page.tsx` | تحديث الـ summary السفلي ليعرض "سائق وبدون سائق" |
+| `app/page.tsx` | تعديل فلتر driver — العربيات الـ `driver='both'` تظهر في اختيار "بسائق" و"بدون سائق" |
+| `app/my-ads/page.tsx` | إضافة اختيار السواق في EditModal (بسائق / بدون / سائق وبدون) |
+| `app/admin/page.tsx` | إظهار badge السواق في لوحة التحكم (أزرق: بسائق / بنفسجي: سائق وبدون / رمادي: بدون) |
+
+### 2️⃣ رفع الصور — حل لمشكلة الموبايل (بديل CldUploadButton)
+| الملف | التغيير |
+|-------|---------|
+| `app/api/upload/route.ts` | **جديد** — API route وسيط: يستقبل الـ file من العميل، يقراه كـ ArrayBuffer، يرسله لـ Cloudinary unsigned upload |
+| `app/add-ad/page.tsx` | استبدال `CldUploadButton` بـ `<input type="file">` مخفي + `<label>` منمّق — الرفع عبر `/api/upload` بدل direct Cloudinary |
+| `app/my-ads/page.tsx` | نفس التغيير — رفع الصور عبر `/api/upload` |
+
+**سبب المشكلة:** `CldUploadButton` بيفتح pop-up widget من Cloudinary. على iOS/Android الـ pop-up بيتقفل أو مش بيشتغل. الحل: `<input type="file">` الأصلي (بيشتغل على كل حاجة) + API route وسيط (عشان مفيش CORS).
+
+**سبب فشل التحميل الأول:** الـ API route كان بيحط الـ `File` object جوه `FormData` جديد وتبعته لـ Cloudinary — لكن Node.js مش بينقل بيانات الـ File صح في الحالة دي. الحل: قراءة الـ File كـ `ArrayBuffer` وعمل `Blob` جديد بيه قبل الإرسال.
+
+### 3️⃣ تسريع تحميل الموقع لليوزر المسجل
+| الملف | التغيير |
+|-------|---------|
+| `app/page.tsx` | تحسين favorites sync: بدال loop فردي `setDoc` لكل favourite، بيعمل `Promise.all` على الفرق بس (local - firestore) |
+| | أول تسجيل: يرحل الـ local favourites اللي مش موجودة في Firebase فقط |
+| | التسجيلات التالية: صفر writes (الـ diff فاضي) — أسرع حاجة |
+
+## الملفات الجديدة
+| الملف | الوظيفة |
+|-------|---------|
+| `app/api/upload/route.ts` | API proxy لرفع الصور لـ Cloudinity من السيرفر |
+
+## الملفات المعدلة
+| الملف | التغيير |
+|-------|---------|
+| `app/add-ad/page.tsx` | + خيار سائق وبدون سائق + رفع صور بـ input file + API route |
+| `app/page.tsx` | + فلتر both + تحسين favorites sync |
+| `app/my-ads/page.tsx` | + خيار سواق في EditModal + رفع صور بـ input file |
+| `app/admin/page.tsx` | + عرض driver badge |
+| `last-save.md` | توثيق التعديلات |
+
+## ملحوظة
+- الرفع بيحتاج Upload Preset `ml_default` في Cloudinary يكون **Unsigned** — تأكد من Cloudinary Dashboard > Settings > Upload > Upload presets > ml_default > Signing Mode = Unsigned

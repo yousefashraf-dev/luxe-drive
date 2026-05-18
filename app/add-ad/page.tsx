@@ -8,6 +8,7 @@ import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp } from 'fir
 
 import { ArrowLeft, Car, Flower2, DollarSign, Phone, MapPin, FileText, Image as ImageIcon, ChevronRight, ChevronLeft, X, User, Calendar } from 'lucide-react';
 import { formatPhone } from '@/lib/utils';
+import { uploadWithProgress } from '@/lib/useUpload';
 
 const LOCATIONS = ['المنوفية', 'القاهرة', 'الجيزة', 'طنطا', 'المنصورة', 'بنها', 'شبين الكوم', 'الإسكندرية'];
 
@@ -69,6 +70,7 @@ export default function AddAdPage() {
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<{current: number; total: number; percent: number} | null>(null);
 
   // Step 0: Car or Flowers
   const [type, setType] = useState<'car' | 'flowers' | null>(null);
@@ -393,25 +395,39 @@ export default function AddAdPage() {
                   <input type="file" accept="image/*" multiple
                     onChange={async (e) => {
                       const files = Array.from(e.target.files || []);
+                      if (files.length === 0) return;
                       setUploading(true);
-                      for (const file of files) {
-                        const fd = new FormData();
-                        fd.append('file', file);
+                      setUploadProgress({ current: 0, total: files.length, percent: 0 });
+                      for (let i = 0; i < files.length; i++) {
                         try {
-                          const res = await fetch('/api/upload', { method: 'POST', body: fd });
-                          const data = await res.json();
-                          if (data.url) setImages(p => [...p, data.url]);
-                          else alert(data.error || 'فشل رفع الصورة، حاول مرة أخرى');
-                        } catch (err) { alert('فشل في الاتصال بالخادم'); }
+                          const url = await uploadWithProgress(files[i], (p) => {
+                            setUploadProgress({ current: i + 1, total: files.length, percent: p.percent });
+                          });
+                          setImages(prev => [...prev, url]);
+                        } catch (err: unknown) {
+                          const msg = err instanceof Error ? err.message : 'خطأ غير معروف';
+                          alert(`فشل رفع ${files[i].name}: ${msg}`);
+                        }
                       }
+                      setUploadProgress(null);
                       setUploading(false);
                       e.target.value = '';
                     }}
                     className="hidden" id="image-upload" />
                   <label htmlFor="image-upload"
                     className="w-full py-8 border-2 border-dashed border-white/10 rounded-[2rem] text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500 hover:border-white/30 hover:text-zinc-300 transition-all flex flex-col items-center gap-3 cursor-pointer">
-                    {uploading ? (
-                      <><div className="w-5 h-5 border-2 border-zinc-500 border-t-zinc-300 rounded-full animate-spin" />جاري الرفع...</>
+                    {uploading && uploadProgress ? (
+                      <div className="flex flex-col items-center gap-2 w-full max-w-xs">
+                        <div className="flex items-center gap-2 text-zinc-400">
+                          <div className="w-4 h-4 border-2 border-zinc-500 border-t-zinc-300 rounded-full animate-spin" />
+                          <span>رفع الصورة {uploadProgress.current} من {uploadProgress.total}</span>
+                        </div>
+                        <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
+                          <div className="h-full bg-[#c5a059] rounded-full transition-all duration-300"
+                            style={{ width: `${uploadProgress.percent}%` }} />
+                        </div>
+                        <span className="text-zinc-500 text-[10px]">{uploadProgress.percent}%</span>
+                      </div>
                     ) : (
                       <><ImageIcon size={28} />{images.length > 0 ? `${images.length} صور مرفوعة` : 'اضغط لرفع الصور'}</>
                     )}
