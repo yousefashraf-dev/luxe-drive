@@ -44,6 +44,7 @@ export function uploadWithProgress(
     xhr.onerror = () => reject(new Error('فشل الاتصال بالخادم'));
     xhr.onabort = () => reject(new Error('تم إلغاء الرفع'));
 
+    xhr.timeout = 120000;
     xhr.open('POST', '/api/upload');
     xhr.send(formData);
   });

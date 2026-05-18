@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { v2 as cloudinary } from 'cloudinary';
 
+export const runtime = 'nodejs';
+
 cloudinary.config({
   cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
   api_key: process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY,
@@ -22,6 +24,10 @@ export async function POST(req: NextRequest) {
         {
           folder: 'cars',
           resource_type: 'image',
+          format: 'webp',
+          width: 1200,
+          crop: 'limit',
+          quality: 'auto',
         },
         (error, result) => {
           if (error) reject(error);
