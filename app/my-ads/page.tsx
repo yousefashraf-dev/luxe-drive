@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { CldUploadButton } from 'next-cloudinary';
+
 import { ArrowLeft, Car, Eye, Calendar, DollarSign, Phone, FileText, Image as ImageIcon, Edit3, X, ChevronRight, ChevronLeft, Star, Save, Flower2, Heart } from 'lucide-react';
 import { formatPhone } from '@/lib/utils';
 
@@ -63,6 +63,8 @@ function EditModal({ ad, onClose, onSaved }) {
   const [location, setLocation] = useState(ad.location || '');
   const [images, setImages] = useState<string[]>(Array.isArray(ad.image) ? ad.image : ad.image ? [ad.image] : []);
   const [bookedDays, setBookedDays] = useState<number[]>(ad.bookedDays || []);
+  const [driver, setDriver] = useState(ad.driver || 'without');
+  const [uploading, setUploading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const handleToggleDay = (day) => {
@@ -73,7 +75,7 @@ function EditModal({ ad, onClose, onSaved }) {
     setSubmitting(true);
     try {
       await updateDoc(doc(db, "cars", ad.id), {
-        name, price, description,
+        name, price, description, driver,
         phone: formatPhone(phone),
         whatsapp: whatsapp ? formatPhone(whatsapp) : '',
         location, image: images, bookedDays,
@@ -117,6 +119,21 @@ function EditModal({ ad, onClose, onSaved }) {
                   ))}
                 </div>
               </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">السواق</label>
+                <div className="flex gap-2">
+                  {[
+                    { key: 'with', label: '👤 بسائق' },
+                    { key: 'without', label: '🚗 بدون سائق' },
+                    { key: 'both', label: '👤 سائق وبدون' },
+                  ].map(opt => (
+                    <button key={opt.key} type="button" onClick={() => setDriver(opt.key)}
+                      className={`px-4 py-2 rounded-full text-[11px] font-bold transition-all border ${
+                        driver === opt.key ? 'bg-black text-white border-black' : 'border-zinc-200 text-zinc-500 hover:border-zinc-400'
+                      }`}>{opt.label}</button>
+                  ))}
+                </div>
+              </div>
             </>
           )}
 
@@ -149,10 +166,32 @@ function EditModal({ ad, onClose, onSaved }) {
 
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">الصور</label>
-            <CldUploadButton uploadPreset="ml_default" onSuccess={(res) => setImages(p => [...p, res.info.secure_url])}
-              className="w-full py-6 border-2 border-dashed border-zinc-200 rounded-[2rem] text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500 hover:border-black hover:text-zinc-400 transition-all flex flex-col items-center gap-3">
-              <ImageIcon size={24} /> {images.length > 0 ? `${images.length} صور` : 'رفع صور'}
-            </CldUploadButton>
+            <input type="file" accept="image/*" multiple
+              onChange={async (e) => {
+                const files = Array.from(e.target.files || []);
+                setUploading(true);
+                for (const file of files) {
+                  const fd = new FormData();
+                  fd.append('file', file);
+                  fd.append('upload_preset', 'ml_default');
+                  try {
+                    const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: fd });
+                    const data = await res.json();
+                    if (data.secure_url) setImages(p => [...p, data.secure_url]);
+                  } catch (err) { console.error('Upload failed', err); }
+                }
+                setUploading(false);
+                e.target.value = '';
+              }}
+              className="hidden" id="edit-image-upload" />
+            <label htmlFor="edit-image-upload"
+              className="w-full py-6 border-2 border-dashed border-zinc-200 rounded-[2rem] text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500 hover:border-black hover:text-zinc-400 transition-all flex flex-col items-center gap-3 cursor-pointer">
+              {uploading ? (
+                <><div className="w-5 h-5 border-2 border-zinc-400 border-t-zinc-600 rounded-full animate-spin" />جاري الرفع...</>
+              ) : (
+                <><ImageIcon size={24} />{images.length > 0 ? `${images.length} صور` : 'رفع صور'}</>
+              )}
+            </label>
             {images.length > 0 && (
               <div className="flex flex-wrap gap-3 mt-4">
                 {images.map((url, i) => (

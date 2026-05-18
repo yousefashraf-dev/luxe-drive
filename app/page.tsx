@@ -223,16 +223,19 @@ export default function Home() {
       const migrateAndFetch = async () => {
         try {
           const localRaw = localStorage.getItem('zafah_favorites');
-          const localFavs: string[] = localRaw ? JSON.parse(localRaw) : [];
+          const localFavs = localRaw ? JSON.parse(localRaw) : [];
           const q = query(collection(db, 'favorites'), where('userId', '==', user.uid));
           const snap = await getDocs(q);
           const firestoreFavs = snap.docs.map(d => d.data().carId);
           const merged = [...new Set([...localFavs, ...firestoreFavs])];
           setFavorites(merged);
-          for (const carId of merged) {
-            await setDoc(doc(db, 'favorites', `${user.uid}_${carId}`), {
-              userId: user.uid, carId, createdAt: serverTimestamp(),
-            });
+          const diff = localFavs.filter(id => !firestoreFavs.includes(id));
+          if (diff.length > 0) {
+            await Promise.all(diff.map(carId =>
+              setDoc(doc(db, 'favorites', `${user.uid}_${carId}`), {
+                userId: user.uid, carId, createdAt: serverTimestamp(),
+              })
+            ));
           }
           localStorage.removeItem('zafah_favorites');
         } catch (err) { console.error('Favorites sync error:', err); }
@@ -287,9 +290,9 @@ export default function Home() {
     if (activeFilter === 'rental' && car.category !== 'car_rental') return false;
     if (activeFilter === 'all' && (car.category === 'flowers' || car.bouquetName)) return false;
 
-    // Filter by driver (only for cars)
+    // Filter by driver (only for cars), 'both' matches either filter
     if (activeFilter !== 'flowers' && driverFilter !== 'all') {
-      if (car.driver !== driverFilter) return false;
+      if (car.driver !== 'both' && car.driver !== driverFilter) return false;
     }
 
     const search = (searchQuery || "").toLowerCase().trim();

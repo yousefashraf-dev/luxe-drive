@@ -98,6 +98,9 @@ export default function AdminDashboard() {
             </div>
             {car.userEmail && <span className="text-[8px] text-zinc-400 truncate max-w-[120px]">{car.userEmail}</span>}
             {car.location && <span className="text-[8px] text-zinc-400">{car.location}</span>}
+            {car.driver && <span className={`text-[8px] px-2 py-0.5 rounded-full font-bold ${
+              car.driver === 'with' ? 'bg-blue-50 text-blue-600' : car.driver === 'both' ? 'bg-purple-50 text-purple-600' : 'bg-gray-50 text-gray-500'
+            }`}>{car.driver === 'with' ? '👤 بسائق' : car.driver === 'both' ? '👤 سائق/بدون' : '🚗 بدون سائق'}</span>}
           </div>
         </div>
       </div>

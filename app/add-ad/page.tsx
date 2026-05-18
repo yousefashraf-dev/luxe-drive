@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { CldUploadButton } from 'next-cloudinary';
+
 import { ArrowLeft, Car, Flower2, DollarSign, Phone, MapPin, FileText, Image as ImageIcon, ChevronRight, ChevronLeft, X, User, Calendar } from 'lucide-react';
 import { formatPhone } from '@/lib/utils';
 
@@ -68,13 +68,14 @@ export default function AddAdPage() {
   const [editMode, setEditMode] = useState(false);
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
 
   // Step 0: Car or Flowers
   const [type, setType] = useState<'car' | 'flowers' | null>(null);
   // Step 1 (car): wedding or rental
   const [carType, setCarType] = useState<'wedding' | 'rental' | null>(null);
   // Step 2 (car): with or without driver
-  const [driver, setDriver] = useState<'with' | 'without' | null>(null);
+  const [driver, setDriver] = useState<'with' | 'without' | 'both' | null>(null);
 
   // Common fields
   const [name, setName] = useState('');
@@ -265,29 +266,37 @@ export default function AddAdPage() {
             </div>
           )}
 
-          {/* Step 2 (car): With or Without driver */}
+          {/* Step 2 (car): With / Without / Both driver */}
           {step === 2 && type === 'car' && (
             <div className="space-y-8">
               <div className="text-center">
                 <p className="text-[9px] tracking-[5px] uppercase text-zinc-500 font-bold">Step 3</p>
                 <h2 className="font-serif text-3xl italic mt-2">عاوز سواق؟</h2>
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-3 gap-4">
                 <button type="button" onClick={() => { setDriver('with'); setStep(3); }}
-                  className={`p-10 rounded-[2.5rem] border-2 transition-all text-center group ${
+                  className={`p-6 rounded-[2rem] border-2 transition-all text-center group ${
                     driver === 'with' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
-                  <User size={40} className={`mx-auto mb-4 ${driver === 'with' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
-                  <p className="text-lg font-bold">بسائق</p>
-                  <p className="text-[10px] text-zinc-500 mt-2">مع سواق محترف</p>
+                  <User size={28} className={`mx-auto mb-3 ${driver === 'with' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
+                  <p className="text-sm font-bold">بسائق</p>
+                  <p className="text-[9px] text-zinc-500 mt-1">مع سواق محترف</p>
                 </button>
                 <button type="button" onClick={() => { setDriver('without'); setStep(3); }}
-                  className={`p-10 rounded-[2.5rem] border-2 transition-all text-center group ${
+                  className={`p-6 rounded-[2rem] border-2 transition-all text-center group ${
                     driver === 'without' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
-                  <Car size={40} className={`mx-auto mb-4 ${driver === 'without' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
-                  <p className="text-lg font-bold">بدون سائق</p>
-                  <p className="text-[10px] text-zinc-500 mt-2">تسوق بنفسك</p>
+                  <Car size={28} className={`mx-auto mb-3 ${driver === 'without' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
+                  <p className="text-sm font-bold">بدون سائق</p>
+                  <p className="text-[9px] text-zinc-500 mt-1">تسوق بنفسك</p>
+                </button>
+                <button type="button" onClick={() => { setDriver('both'); setStep(3); }}
+                  className={`p-6 rounded-[2rem] border-2 transition-all text-center group ${
+                    driver === 'both' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
+                  }`}>
+                  <User size={28} className={`mx-auto mb-3 ${driver === 'both' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
+                  <p className="text-sm font-bold">سائق وبدون سائق</p>
+                  <p className="text-[9px] text-zinc-500 mt-1">الخيارين متاحين</p>
                 </button>
               </div>
             </div>
@@ -381,11 +390,32 @@ export default function AddAdPage() {
 
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">الصور</label>
-                  <CldUploadButton uploadPreset="ml_default" onSuccess={(res) => setImages(p => [...p, res.info.secure_url])}
-                    className="w-full py-8 border-2 border-dashed border-white/10 rounded-[2rem] text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500 hover:border-white/30 hover:text-zinc-300 transition-all flex flex-col items-center gap-3">
-                    <ImageIcon size={28} />
-                    {images.length > 0 ? `${images.length} صور مرفوعة` : 'اضغط لرفع الصور'}
-                  </CldUploadButton>
+                  <input type="file" accept="image/*" multiple
+                    onChange={async (e) => {
+                      const files = Array.from(e.target.files || []);
+                      setUploading(true);
+                      for (const file of files) {
+                        const fd = new FormData();
+                        fd.append('file', file);
+                        fd.append('upload_preset', 'ml_default');
+                        try {
+                          const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: fd });
+                          const data = await res.json();
+                          if (data.secure_url) setImages(p => [...p, data.secure_url]);
+                        } catch (err) { console.error('Upload failed', err); }
+                      }
+                      setUploading(false);
+                      e.target.value = '';
+                    }}
+                    className="hidden" id="image-upload" />
+                  <label htmlFor="image-upload"
+                    className="w-full py-8 border-2 border-dashed border-white/10 rounded-[2rem] text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500 hover:border-white/30 hover:text-zinc-300 transition-all flex flex-col items-center gap-3 cursor-pointer">
+                    {uploading ? (
+                      <><div className="w-5 h-5 border-2 border-zinc-500 border-t-zinc-300 rounded-full animate-spin" />جاري الرفع...</>
+                    ) : (
+                      <><ImageIcon size={28} />{images.length > 0 ? `${images.length} صور مرفوعة` : 'اضغط لرفع الصور'}</>
+                    )}
+                  </label>
                 {images.length > 0 && (
                   <div className="flex flex-wrap gap-3 mt-4">
                     {images.map((url, i) => (
@@ -409,7 +439,7 @@ export default function AddAdPage() {
                   <p className="text-[11px] text-zinc-400">
                     <span className="text-[#c5a059] font-bold">{carType === 'wedding' ? '🎊 زفه' : '🚙 إيجار'}</span>
                     {' • '}
-                    <span className="text-[#c5a059] font-bold">{driver === 'with' ? '👤 بسائق' : '🚗 بدون سائق'}</span>
+                    <span className="text-[#c5a059] font-bold">{driver === 'with' ? '👤 بسائق' : driver === 'both' ? '👤 سائق وبدون سائق' : '🚗 بدون سائق'}</span>
                   </p>
                 </div>
               )}
