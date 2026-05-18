@@ -8,6 +8,12 @@ import { collection, getDocs, updateDoc, doc, increment, query, where, setDoc, d
 import { useAuth } from '@/lib/AuthContext';
 import Link from 'next/link';
 
+/* ─── Optimize Cloudinary image URL ─── */
+function optimizeImage(url: string, width: number): string {
+  if (!url || !url.includes('res.cloudinary.com')) return url;
+  return url.replace('/upload/', `/upload/w_${width},q_auto/`);
+}
+
 /* ─── detect iOS / Android ─── */
 function getOS(): 'ios' | 'android' | 'other' {
   if (typeof navigator === 'undefined') return 'other';
@@ -350,6 +356,18 @@ export default function Home() {
 
   const fetchCars = async () => {
     setLoading(true);
+    // Show cached data immediately if available (stale-while-revalidate)
+    try {
+      const cached = localStorage.getItem('luxe_cars_cache');
+      if (cached) {
+        const { data, ts } = JSON.parse(cached);
+        if (Date.now() - ts < 5 * 60 * 1000) {
+          const sorted = [...data].sort(sortFn);
+          setCars(sorted);
+          setLoading(false);
+        }
+      }
+    } catch (_) {}
     try {
       const q = query(collection(db, "cars"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
       const snap = await getDocs(q);
@@ -703,7 +721,7 @@ export default function Home() {
             {/* ── Image panel ── */}
             <div className="relative bg-zinc-900 flex-shrink-0 h-[48vw] min-h-[200px] max-h-[280px] md:h-auto md:w-3/5 md:max-h-[88vh]">
               <Image
-                src={selectedCar.images[currentImageIndex]}
+                src={optimizeImage(selectedCar.images[currentImageIndex], 800)}
                 alt={selectedCar.name}
                 fill
                 sizes="(max-width: 768px) 100vw, 60vw"
@@ -913,7 +931,7 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
 
         <div className="relative h-[58vw] md:h-72 overflow-hidden">
           <Image
-            src={Array.isArray(car.image) ? car.image[0] : car.image}
+            src={optimizeImage(Array.isArray(car.image) ? car.image[0] : car.image, 400)}
             alt={car.name}
             fill
             sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"

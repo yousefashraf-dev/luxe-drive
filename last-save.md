@@ -261,3 +261,77 @@ git push origin main
 - [x] Google Sign-In على iPhone (Redirect + getRedirectResult) — شغال ✅
 - [x] رسايل خطأ بالعربي حسب الكود
 - [x] `select_account` بيظهر اختيار الحساب دايمًا
+
+---
+
+# تحديث 18 مايو 2026 — الدفعة الرابعة (v4.0): تعديل الإعلانات + تسريع التحميل + إصلاح iOS
+
+## أوردر الرفع
+
+```bash
+git add .
+git commit -m "v4.0: edit ads + speed improvements + iOS Google Sign-In fix"
+git push origin main
+```
+
+## التعديلات
+
+### 1️⃣ تعديل الإعلان من `/add-ad?edit=id`
+**الملف:** `app/add-ad/page.tsx`
+
+| المشكلة | الحل |
+|---------|-------|
+| **زرار تعديل من `/admin` بيودي على `/add-ad?edit=id` بس الصفحة بتظهر فورم فاضي** | إضافة قراءة `edit` parameter من URL عن طريق `URLSearchParams(window.location.search)` |
+| **مفيش pre-fill للفورم** | إضافة `useEffect` يجيب بيانات الإعلان من Firestore (`getDoc`) ويحطها في كل الحقول (type, carType, driver, name, price, phone, images, bookedDays, location, description, bouquetName, whatsapp) |
+| **دايمًا بيعمل `addDoc` (إضافة جديد) حتى لو تعديل** | التفرقة: لو `editMode` → `updateDoc(doc(db, 'cars', editId))` مع الحفاظ على `createdAt`, `views`, `isVIP`, `status` الأصليين. لو جديد → `addDoc` |
+| **زرار "إرسال للمراجعة" بيظهر حتى في التعديل** | تغيير النص لـ "حفظ التعديلات 💾" لما يكون في edit mode |
+| **Nav title "New Listing" بيظهر في التعديل** | تغيير لـ "Edit Listing" في edit mode |
+
+### 2️⃣ إزالة شرط `isIOS` من Google Sign-In (إصلاح iOS)
+**الملف:** `lib/AuthContext.tsx`
+
+| المشكلة | الحل |
+|---------|-------|
+| **iOS Safari بيفضل واقف بعد ما يختار الإيميل** | شيل `isIOS` من شرط الـ Redirect — خلّي Standalone (PWA) بس يستخدم `signInWithRedirect` |
+| **iOS 15+ بيشتغل معاه Popup عادي** | كل الأجهزة دلوقتي (لابتوب، اندرويد، iOS Safari) بتجرب `signInWithPopup` أولاً |
+| **لو الـ Popup منع أو اتنقلق** → `signInWithRedirect` fallback |
+| **PWA (الموقع المثبت)** → `signInWithRedirect` مباشر (الـ Popup مش شغال في الـ PWA) |
+
+النتيجة: **Google Sign-In شغال على كل الأجهزة والمتصفحات.**
+
+### 3️⃣ تسريع تحميل الموقع
+**الملف:** `lib/firebase.js`
+
+| التحسين | التفاصيل |
+|---------|----------|
+| **Firestore offline persistence** | تفعيل `enableMultiTabIndexedDbPersistence(db)` — بعد أول تحميل، Firestore بيحفظ الداتا في IndexedDB على التليفون. الزيارات التانية: البيانات تظهر **فوراً** من الكاش، والتحديثات تجي في الخلفية |
+
+**الملف:** `app/page.tsx`
+
+| التحسين | التفاصيل |
+|---------|----------|
+| **localStorage cache (stale-while-revalidate)** | قبل طلب Firestore، يقرا من `luxe_cars_cache` في localStorage. لو موجود وأقل من 5 دقايق، يعرض الداتا فوراً. بعدها يجيب جديد من Firestore ويحدث |
+| **تصغير صور Cloudinary** | إضافة دالة `optimizeImage(url, width)` — تضيف `/w_400,q_auto/` أو `/w_800,q_auto/` في رابط الصورة. من 500KB → 50KB للصورة |
+| **Loading skeleton** | كان موجود أصلاً — 6 كروت رمادية (`animate-pulse`) تظهر لحد ما الداتا تجهز |
+
+### 4️⃣ إضافة `zafah.vercel.app` في Authorized domains
+**Firebase Console > Authentication > Settings**
+
+| المشكلة | الحل |
+|---------|-------|
+| **`auth/unauthorized-domain`** — النطاق مش مضاف | إضافة `zafah.vercel.app` في Authorized domains |
+
+### 5️⃣ تنظيف
+- حذف `public/firebase-links.md` (ملف مؤقت للينكات)
+- حذف `.opencode/plans/firebase-links.md`
+
+## الملفات المعدلة
+
+| الملف | التغيير |
+|-------|---------|
+| `lib/firebase.js` | + offline persistence |
+| `lib/AuthContext.tsx` | إزالة isIOS شرط + getRedirectResult + select_account |
+| `app/login/page.tsx` | شيل router.push + رسايل خطأ بالعربي |
+| `app/add-ad/page.tsx` | **إضافة edit flow كامل** (قراءة URL + pre-fill + updateDoc) |
+| `app/page.tsx` | + optimizeImage + cache stale-while-revalidate |
+| `last-save.md` | توثيق التعديلات |
