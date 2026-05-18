@@ -401,7 +401,7 @@ export default function AddAdPage() {
                           const res = await fetch('/api/upload', { method: 'POST', body: fd });
                           const data = await res.json();
                           if (data.url) setImages(p => [...p, data.url]);
-                          else alert('فشل رفع الصورة، حاول مرة أخرى');
+                          else alert(data.error || 'فشل رفع الصورة، حاول مرة أخرى');
                         } catch (err) { alert('فشل في الاتصال بالخادم'); }
                       }
                       setUploading(false);

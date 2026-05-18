@@ -5,11 +5,14 @@ export async function POST(req: NextRequest) {
     const formData = await req.formData();
     const file = formData.get('file') as File | null;
     if (!file) {
-      return NextResponse.json({ error: 'No file provided' }, { status: 400 });
+      return NextResponse.json({ error: 'لم يتم إرسال ملف' }, { status: 400 });
     }
 
+    const buffer = await file.arrayBuffer();
+    const blob = new Blob([buffer], { type: file.type });
+
     const body = new FormData();
-    body.append('file', file);
+    body.append('file', blob, file.name);
     body.append('upload_preset', 'ml_default');
 
     const res = await fetch(
@@ -18,15 +21,15 @@ export async function POST(req: NextRequest) {
     );
 
     if (!res.ok) {
-      const err = await res.text();
-      console.error('Cloudinary upload failed:', err);
-      return NextResponse.json({ error: 'Upload failed' }, { status: 502 });
+      const errMsg = await res.text();
+      console.error('Cloudinary upload failed:', errMsg);
+      return NextResponse.json({ error: `Cloudinary: ${errMsg}` }, { status: 502 });
     }
 
     const data = await res.json();
     return NextResponse.json({ url: data.secure_url });
   } catch (err) {
     console.error('Upload error:', err);
-    return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    return NextResponse.json({ error: 'خطأ في الخادم الداخلي' }, { status: 500 });
   }
 }
