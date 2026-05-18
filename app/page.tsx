@@ -2,9 +2,11 @@
 'use client';
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
-import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share2, Link2, Check } from 'lucide-react';
+import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share2, Check, User, LogOut, Plus, Heart, Flower2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, updateDoc, doc, increment } from 'firebase/firestore';
+import { useAuth } from '@/lib/AuthContext';
+import Link from 'next/link';
 
 /* ─── detect iOS / Android ─── */
 function getOS(): 'ios' | 'android' | 'other' {
@@ -97,6 +99,90 @@ function InstallBanner({ onDismiss }: { onDismiss: () => void }) {
   return null;
 }
 
+/* ── Smart search: model → brand · عربي · English ── */
+const modelInfo: Record<string, { brand: string; en: string }> = {
+  // BMW
+  'm3': { brand: 'bmw', en: 'm3' }, 'm4': { brand: 'bmw', en: 'm4' },
+  'm5': { brand: 'bmw', en: 'm5' }, 'x3': { brand: 'bmw', en: 'x3' },
+  'x5': { brand: 'bmw', en: 'x5' }, 'x6': { brand: 'bmw', en: 'x6' },
+  '320': { brand: 'bmw', en: '320' }, '520': { brand: 'bmw', en: '520' },
+  // Hyundai
+  'النترا': { brand: 'hyundai', en: 'elantra' }, 'elantra': { brand: 'hyundai', en: 'elantra' },
+  'cn7': { brand: 'hyundai', en: 'cn7' }, 'سي ان سفن': { brand: 'hyundai', en: 'cn7' },
+  'فيرنا': { brand: 'hyundai', en: 'verna' }, 'verna': { brand: 'hyundai', en: 'verna' },
+  'accent': { brand: 'hyundai', en: 'accent' },
+  'توسان': { brand: 'hyundai', en: 'tucson' }, 'tucson': { brand: 'hyundai', en: 'tucson' },
+  'سنتافي': { brand: 'hyundai', en: 'santafe' }, 'santafe': { brand: 'hyundai', en: 'santafe' },
+  'ازيرا': { brand: 'hyundai', en: 'azera' }, 'azera': { brand: 'hyundai', en: 'azera' },
+  'سوناتا': { brand: 'hyundai', en: 'sonata' }, 'sonata': { brand: 'hyundai', en: 'sonata' },
+  // Nissan
+  'صني': { brand: 'nissan', en: 'sunny' }, 'sunny': { brand: 'nissan', en: 'sunny' },
+  'سينترا': { brand: 'nissan', en: 'sentra' }, 'sentra': { brand: 'nissan', en: 'sentra' },
+  'قشقاي': { brand: 'nissan', en: 'qashqai' }, 'qashqai': { brand: 'nissan', en: 'qashqai' },
+  'maxima': { brand: 'nissan', en: 'maxima' },
+  'باترول': { brand: 'nissan', en: 'patrol' }, 'patrol': { brand: 'nissan', en: 'patrol' },
+  // Toyota
+  'كورولا': { brand: 'toyota', en: 'corolla' }, 'corolla': { brand: 'toyota', en: 'corolla' },
+  'كامري': { brand: 'toyota', en: 'camry' }, 'camry': { brand: 'toyota', en: 'camry' },
+  'يارس': { brand: 'toyota', en: 'yaris' }, 'yaris': { brand: 'toyota', en: 'yaris' },
+  'هايلكس': { brand: 'toyota', en: 'hilux' }, 'hilux': { brand: 'toyota', en: 'hilux' },
+  'لاندكروزر': { brand: 'toyota', en: 'land cruiser' }, 'land cruiser': { brand: 'toyota', en: 'land cruiser' },
+  'راف فور': { brand: 'toyota', en: 'rav4' }, 'rav4': { brand: 'toyota', en: 'rav4' },
+  'fortuner': { brand: 'toyota', en: 'fortuner' },
+  // Mercedes
+  'maybach': { brand: 'mercedes', en: 'maybach' }, 'مايبخ': { brand: 'mercedes', en: 'maybach' },
+  'e class': { brand: 'mercedes', en: 'e class' }, 'e250': { brand: 'mercedes', en: 'e250' },
+  'اي كلاس': { brand: 'mercedes', en: 'e class' },
+  'c class': { brand: 'mercedes', en: 'c class' }, 'c200': { brand: 'mercedes', en: 'c200' }, 'c180': { brand: 'mercedes', en: 'c180' },
+  'سي كلاس': { brand: 'mercedes', en: 'c class' },
+  's class': { brand: 'mercedes', en: 's class' }, 's500': { brand: 'mercedes', en: 's500' },
+  'اس كلاس': { brand: 'mercedes', en: 's class' },
+  'g class': { brand: 'mercedes', en: 'g class' }, 'g63': { brand: 'mercedes', en: 'g63' },
+  'جي كلاس': { brand: 'mercedes', en: 'g class' },
+  'gle': { brand: 'mercedes', en: 'gle' }, 'glc': { brand: 'mercedes', en: 'glc' },
+  // Range Rover
+  'range rover': { brand: 'range rover', en: 'range rover' }, 'رانج روفر': { brand: 'range rover', en: 'range rover' },
+  'sport': { brand: 'range rover', en: 'sport' }, 'سبورت': { brand: 'range rover', en: 'sport' },
+  'velar': { brand: 'range rover', en: 'velar' }, 'فيلار': { brand: 'range rover', en: 'velar' },
+  'vogue': { brand: 'range rover', en: 'vogue' }, 'فوغ': { brand: 'range rover', en: 'vogue' },
+  'evoque': { brand: 'range rover', en: 'evoque' },
+  // Peugeot
+  'peugeot': { brand: 'peugeot', en: 'peugeot' }, 'بيجو': { brand: 'peugeot', en: 'peugeot' },
+  '301': { brand: 'peugeot', en: '301' }, '208': { brand: 'peugeot', en: '208' },
+  '308': { brand: 'peugeot', en: '308' }, '405': { brand: 'peugeot', en: '405' },
+  '508': { brand: 'peugeot', en: '508' }, '2008': { brand: 'peugeot', en: '2008' },
+  '3008': { brand: 'peugeot', en: '3008' },
+  // Mitsubishi
+  'lancer': { brand: 'mitsubishi', en: 'lancer' }, 'لانسر': { brand: 'mitsubishi', en: 'lancer' },
+  'lancer shark': { brand: 'mitsubishi', en: 'lancer shark' }, 'لانسر شارك': { brand: 'mitsubishi', en: 'lancer shark' },
+  'pajero': { brand: 'mitsubishi', en: 'pajero' }, 'باجيرو': { brand: 'mitsubishi', en: 'pajero' },
+  'eclipse cross': { brand: 'mitsubishi', en: 'eclipse cross' },
+  // Kia
+  'cerato': { brand: 'kia', en: 'cerato' }, 'سيراتو': { brand: 'kia', en: 'cerato' },
+  'sportage': { brand: 'kia', en: 'sportage' }, 'سبورتاج': { brand: 'kia', en: 'sportage' },
+  'picanto': { brand: 'kia', en: 'picanto' }, 'بيكانتو': { brand: 'kia', en: 'picanto' },
+  'pegas': { brand: 'kia', en: 'pegas' }, 'بيجاس': { brand: 'kia', en: 'pegas' },
+  'k5': { brand: 'kia', en: 'k5' }, 'soul': { brand: 'kia', en: 'soul' },
+  // Honda
+  'civic': { brand: 'honda', en: 'civic' }, 'سيفيك': { brand: 'honda', en: 'civic' },
+  'accord': { brand: 'honda', en: 'accord' }, 'اكورد': { brand: 'honda', en: 'accord' },
+  'city': { brand: 'honda', en: 'city' }, 'crv': { brand: 'honda', en: 'crv' }, 'cr-v': { brand: 'honda', en: 'cr-v' },
+  // Chevrolet
+  'cruze': { brand: 'chevrolet', en: 'cruze' }, 'كروز': { brand: 'chevrolet', en: 'cruze' },
+  'malibu': { brand: 'chevrolet', en: 'malibu' }, 'ماليبو': { brand: 'chevrolet', en: 'malibu' },
+  'spark': { brand: 'chevrolet', en: 'spark' }, 'سبارك': { brand: 'chevrolet', en: 'spark' },
+  'captiva': { brand: 'chevrolet', en: 'captiva' }, 'optra': { brand: 'chevrolet', en: 'optra' },
+  // Renault
+  'duster': { brand: 'renault', en: 'duster' }, 'داستر': { brand: 'renault', en: 'duster' },
+  'logan': { brand: 'renault', en: 'logan' }, 'لوجان': { brand: 'renault', en: 'logan' },
+  'megane': { brand: 'renault', en: 'megane' }, 'ميجان': { brand: 'renault', en: 'megane' },
+  // Porsche
+  'cayenne': { brand: 'porsche', en: 'cayenne' }, 'كايين': { brand: 'porsche', en: 'cayenne' },
+  // Ferrari / Lamborghini
+  'ferrari': { brand: 'ferrari', en: 'ferrari' }, 'فيراري': { brand: 'ferrari', en: 'ferrari' },
+  'lamborghini': { brand: 'lamborghini', en: 'lamborghini' }, 'لامبورجيني': { brand: 'lamborghini', en: 'lamborghini' },
+};
+
 /* ════════════════════════════════════════
    MAIN PAGE
 ════════════════════════════════════════ */
@@ -115,25 +201,82 @@ export default function Home() {
   const [isClosing, setIsClosing]       = useState(false);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [copied, setCopied]             = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [showSupport, setShowSupport] = useState(false);
+
+  const [activeFilter, setActiveFilter] = useState<'all' | 'wedding' | 'rental' | 'flowers' | 'favorites'>('all');
+  const [driverFilter, setDriverFilter] = useState<'all' | 'with' | 'without'>('all');
+  const [favorites, setFavorites] = useState<string[]>([]);
+
+  const { user, userProfile, loading: authLoading, isAdmin, signInWithGoogle, signOut } = useAuth();
+
+  /* ── Favorites management ── */
+  useEffect(() => {
+    if (user) {
+      // For logged-in users, fetch from Firebase (implement later)
+    } else {
+      try {
+        const stored = localStorage.getItem('zafah_favorites');
+        if (stored) setFavorites(JSON.parse(stored));
+      } catch {}
+    }
+  }, [user]);
+
+  const toggleFavorite = (carId: string) => {
+    setFavorites(prev => {
+      const updated = prev.includes(carId) ? prev.filter(id => id !== carId) : [...prev, carId];
+      if (!user) {
+        try { localStorage.setItem('zafah_favorites', JSON.stringify(updated)); } catch {}
+      }
+      return updated;
+    });
+  };
 
   const searchRef = useRef<HTMLDivElement>(null);
   const fleetRef  = useRef<HTMLDivElement>(null);
   const myWhatsAppNumber = "201095976766";
 
-  /* ── Arabic + direct search ── */
   const displayCars = (cars || []).filter((car) => {
-    const search = (searchQuery || "").toLowerCase();
+    // Only show active (published) ads
+    if (car.status && car.status !== 'active') return false;
+
+    // Filter by favorites
+    if (activeFilter === 'favorites') {
+      return favorites.includes(car.id);
+    }
+
+    // Filter by category
+    if (activeFilter === 'flowers' && car.category !== 'flowers' && !car.bouquetName) return false;
+    if (activeFilter === 'wedding' && car.category !== 'car_wedding') return false;
+    if (activeFilter === 'rental' && car.category !== 'car_rental') return false;
+    if (activeFilter === 'all' && (car.category === 'flowers' || car.bouquetName)) return false;
+
+    // Filter by driver (only for cars)
+    if (activeFilter !== 'flowers' && driverFilter !== 'all') {
+      if (car.driver !== driverFilter) return false;
+    }
+
+    const search = (searchQuery || "").toLowerCase().trim();
     if (!search) return true;
-    const carName  = (car.name  || "").toLowerCase();
-    const carBrand = (car.brand || "").toLowerCase();
-    const translations: { [key: string]: string } = {
-      'بي ام': 'bmw', 'مرسيدس': 'mercedes', 'بورشه': 'porsche', 'تويوتا': 'toyota'
+    const carName = (car.name || "").toLowerCase();
+
+    if (carName.includes(search)) return true;
+
+    const match = modelInfo[search];
+    if (match) {
+      if (carName.includes(match.brand)) return true;
+      if (carName.includes(match.en)) return true;
+    }
+
+    const arabicBrands: Record<string, string> = {
+      'بي ام': 'bmw', 'مرسيدس': 'mercedes', 'بورشه': 'porsche', 'تويوتا': 'toyota',
+      'نيسان': 'nissan', 'هيونداي': 'hyundai', 'هوندا': 'honda', 'بيجو': 'peugeot',
+      'ميتسوبيشي': 'mitsubishi', 'رنج روفر': 'range rover', 'رانج روفر': 'range rover',
+      'شيفروليه': 'chevrolet', 'كيا': 'kia', 'رينو': 'renault',
     };
-    const matchesDirect = carName.includes(search) || carBrand.includes(search);
-    const matchesArabic = Object.keys(translations).some(
-      k => search.includes(k) && (carName.includes(translations[k]) || carBrand.includes(translations[k]))
+    return Object.entries(arabicBrands).some(
+      ([ar, en]) => ar.includes(search) && carName.includes(en)
     );
-    return matchesDirect || matchesArabic;
   });
 
   /* ── scroll + outside-click ── */
@@ -209,8 +352,8 @@ export default function Home() {
   /* ── search suggestions ── */
   useEffect(() => {
     if (searchQuery.length > 0) {
-      const f = cars.filter(c => c?.name?.toLowerCase().includes(searchQuery.toLowerCase()));
-      setSuggestions(f.slice(0, 5)); setShowSuggestions(true);
+      const f = displayCars.slice(0, 5);
+      setSuggestions(f); setShowSuggestions(true);
     } else { setSuggestions([]); setShowSuggestions(false); }
   }, [searchQuery, cars]);
 
@@ -252,13 +395,6 @@ export default function Home() {
       {/* ── PWA Banner ── */}
       {showInstallBanner && <InstallBanner onDismiss={dismissBanner} />}
 
-      {/* ── Admin ── */}
-      <div className="fixed top-28 right-6 z-[110]">
-        <a href="/admin" className="w-10 h-10 rounded-full bg-black text-white flex items-center justify-center shadow-2xl hover:scale-110 transition-all duration-500 border border-white/20">
-          <span className="text-[10px] font-bold">USF</span>
-        </a>
-      </div>
-
       {/* ════ NAV ════ */}
       <nav className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a] text-white px-6 md:px-12 py-5 flex justify-between items-center border-b border-white/5 shadow-2xl">
         <div className="flex-1 flex flex-col items-start cursor-default group">
@@ -295,9 +431,98 @@ export default function Home() {
           )}
         </div>
 
-        <div className="flex-1 flex justify-end items-center gap-6">
-          <span className="text-[9px] tracking-[5px] font-bold uppercase opacity-50 hidden lg:block text-zinc-400">Luxury Service</span>
-          <a href={`tel:+${myWhatsAppNumber}`} className="text-[9px] font-bold tracking-[3px] uppercase border border-white/20 px-6 py-2.5 rounded-full hover:bg-white hover:text-black transition-all">Connect</a>
+        <div className="flex-1 flex justify-end items-center gap-3">
+          <div className="relative">
+            <button
+              onClick={() => setShowSupport(!showSupport)}
+              className="w-10 h-10 rounded-full bg-black border border-white/20 flex items-center justify-center hover:bg-zinc-800 transition-all shadow-lg active:scale-90"
+              title="الدعم الفني"
+            >
+              <Phone size={15} className="text-white" />
+            </button>
+            {showSupport && (
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-3 w-64 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[200] p-5 text-center">
+                <div className="w-12 h-12 rounded-full bg-[#c5a059]/20 flex items-center justify-center mx-auto mb-3">
+                  <Phone size={20} className="text-[#c5a059]" />
+                </div>
+                <p className="text-white text-sm font-bold">الدعم الفني</p>
+                <p className="text-zinc-400 text-[10px] mt-1">تواصل معنا واتساب</p>
+                <a
+                  href={`https://wa.me/${myWhatsAppNumber}`}
+                  target="_blank"
+                  className="mt-4 inline-flex items-center gap-2 bg-[#25D366] text-white px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-[2px] hover:bg-[#20bd5a] transition-all active:scale-95"
+                >
+                  <MessageCircle size={14} />
+                  واتساب
+                </a>
+                <a
+                  href={`tel:+${myWhatsAppNumber}`}
+                  className="mt-2 inline-flex items-center gap-2 bg-white/10 text-white px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-[2px] hover:bg-white/20 transition-all active:scale-95 w-full justify-center"
+                >
+                  <Phone size={14} />
+                  اتصال
+                </a>
+                <button
+                  onClick={() => setShowSupport(false)}
+                  className="mt-3 text-[9px] text-zinc-600 hover:text-zinc-400 transition-all"
+                >
+                  إغلاق
+                </button>
+              </div>
+            )}
+          </div>
+
+          {!authLoading && (
+            user && userProfile ? (
+              <div className="relative">
+                <button
+                  onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  className="flex items-center gap-2 bg-white/10 border border-white/20 px-4 py-2.5 rounded-full hover:bg-white/20 transition-all"
+                >
+                  <div className="w-7 h-7 rounded-full bg-[#c5a059]/20 flex items-center justify-center">
+                    <User size={14} className="text-[#c5a059]" />
+                  </div>
+                  <span className="text-[10px] font-bold tracking-[1px] hidden md:block truncate max-w-[80px]">
+                    {userProfile.displayName || 'User'}
+                  </span>
+                </button>
+
+                {userMenuOpen && (
+                  <div className="absolute top-full right-0 mt-2 w-52 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[200]">
+                    <Link href="/add-ad" className="flex items-center gap-3 px-5 py-3.5 hover:bg-white/5 transition-all text-[11px] border-b border-white/5">
+                      <Plus size={14} className="text-green-400" />
+                      إضافة إعلان
+                    </Link>
+                    <Link href="/my-ads" className="flex items-center gap-3 px-5 py-3.5 hover:bg-white/5 transition-all text-[11px] border-b border-white/5">
+                      <Heart size={14} className="text-white/50" />
+                      إعلاناتي
+                    </Link>
+                    {isAdmin && (
+                      <Link href="/admin" className="flex items-center gap-3 px-5 py-3.5 hover:bg-white/5 transition-all text-[11px] border-b border-white/5">
+                        <Star size={14} className="text-[#c5a059]" />
+                        Admin Panel
+                      </Link>
+                    )}
+                    <button
+                      onClick={() => { signOut(); setUserMenuOpen(false); }}
+                      className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-white/5 transition-all text-[11px] text-red-400"
+                    >
+                      <LogOut size={14} />
+                      تسجيل خروج
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                onClick={signInWithGoogle}
+                className="flex items-center gap-2 bg-[#c5a059]/10 border border-[#c5a059]/30 px-4 py-2.5 rounded-full hover:bg-[#c5a059]/20 transition-all group"
+              >
+                <User size={13} className="text-[#c5a059]" />
+                <span className="text-[9px] font-bold tracking-[2px] uppercase text-[#c5a059]">Sign In</span>
+              </button>
+            )
+          )}
         </div>
       </nav>
 
@@ -319,6 +544,46 @@ export default function Home() {
 
         {/* Fleet */}
         <section ref={fleetRef} className="max-w-7xl mx-auto px-4 md:px-6 pb-40">
+          {/* ── Filter Bar ── */}
+          <div className="flex flex-wrap gap-3 mb-10 justify-center">
+            {[
+              { key: 'all', label: '🚗 عربيات', icon: null },
+              { key: 'wedding', label: '🎊 زفه', icon: null },
+              { key: 'rental', label: '🚙 إيجار', icon: null },
+              { key: 'flowers', label: '💐 ورد', icon: null },
+              { key: 'favorites', label: `❤️ مفضلة (${favorites.length})`, icon: null },
+            ].map(f => (
+              <button key={f.key} onClick={() => setActiveFilter(f.key as any)}
+                className={`px-5 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-[2px] transition-all border ${
+                  activeFilter === f.key
+                    ? 'bg-[#c5a059] text-black border-[#c5a059] shadow-lg'
+                    : 'bg-white/10 text-white/60 border-white/10 hover:bg-white/20 hover:text-white'
+                }`}>
+                {f.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Driver Filter (only for wedding/rental) ── */}
+          {(activeFilter === 'wedding' || activeFilter === 'rental') && (
+            <div className="flex flex-wrap gap-3 mb-10 justify-center">
+              {[
+                { key: 'all', label: 'الكل' },
+                { key: 'with', label: '👤 بسائق' },
+                { key: 'without', label: '🚗 بدون سائق' },
+              ].map(f => (
+                <button key={f.key} onClick={() => setDriverFilter(f.key as any)}
+                  className={`px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-[2px] transition-all border ${
+                    driverFilter === f.key
+                      ? 'bg-white/20 text-white border-white/30'
+                      : 'bg-transparent text-white/40 border-white/10 hover:text-white/60'
+                  }`}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          )}
+
           {(loading || (cars.length === 0 && !searchQuery)) ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
               {[1,2,3].map(i => (
@@ -340,6 +605,8 @@ export default function Home() {
                 <CarCard key={car.id} car={car} index={index}
                   onClick={() => handleSelectCar(car)}
                   onShare={e => { e.stopPropagation(); shareCar(car); }}
+                  isFavorited={favorites.includes(car.id)}
+                  onToggleFavorite={(e) => { e.stopPropagation(); toggleFavorite(car.id); }}
                 />
               ))}
             </div>
@@ -371,17 +638,19 @@ export default function Home() {
 
             {/* ── Image panel ── */}
             <div className="relative bg-zinc-900 flex-shrink-0 h-[48vw] min-h-[200px] max-h-[280px] md:h-auto md:w-3/5 md:max-h-[88vh]">
-              <img
+              <Image
                 src={selectedCar.images[currentImageIndex]}
                 alt={selectedCar.name}
-                className="w-full h-full object-cover cursor-zoom-in transition-opacity duration-500"
+                fill
+                sizes="(max-width: 768px) 100vw, 60vw"
+                className="object-cover cursor-zoom-in transition-opacity duration-500"
                 onClick={() => setZoomedImage(selectedCar.images[currentImageIndex])}
               />
               <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm text-white rounded-full px-3 py-1 flex items-center gap-1.5 pointer-events-none">
                 <ZoomIn size={11} />
                 <span className="text-[8px] tracking-widest"> </span>
               </div>
-              {selectedCar.images.length > 1 && (
+              {selectedCar.images.length > 1 && ( 
                 <div className="absolute inset-0 flex items-center justify-between px-3 pointer-events-none">
                   <button className="pointer-events-auto w-10 h-10 bg-black/40 backdrop-blur-md rounded-full text-white flex items-center justify-center border border-white/20 active:scale-90 transition-all"
                     onClick={e => { e.stopPropagation(); setCurrentImageIndex(p => (p - 1 + selectedCar.images.length) % selectedCar.images.length); }}>
@@ -509,13 +778,13 @@ export default function Home() {
 
               {/* CTA */}
               <div className="mt-5 flex gap-3">
-                <a href={`https://wa.me/${selectedCar.phone || myWhatsAppNumber}`} target="_blank"
+                <a href={`https://wa.me/${selectedCar.whatsapp || selectedCar.phone || myWhatsAppNumber}?text=${encodeURIComponent("مرحباً، أنا مهتم بـ " + selectedCar.name)}`} target="_blank"
                   className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] text-white py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[2px] shadow-lg active:scale-95 transition-all">
                   <MessageCircle size={16} /> WhatsApp
                 </a>
-                <a href={`tel:+${selectedCar.phone || myWhatsAppNumber}`}
+                <a href={`tel:+${selectedCar.phone || selectedCar.whatsapp || myWhatsAppNumber}`}
                   className="flex-1 flex items-center justify-center gap-2 bg-black text-white py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[2px] shadow-lg active:scale-95 transition-all">
-                  <Phone size={16} /> Reserve
+                  <Phone size={16} /> Call
                 </a>
               </div>
             </div>
@@ -530,8 +799,9 @@ export default function Home() {
           <button className="absolute top-6 right-6 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all group z-10" onClick={() => setZoomedImage(null)}>
             <X size={22} className="transition-transform duration-500 group-hover:rotate-90" />
           </button>
-          <img src={zoomedImage} alt="Zoomed"
-            className="max-w-full max-h-full object-contain rounded-2xl shadow-2xl select-none"
+          <Image src={zoomedImage} alt="Zoomed"
+            fill
+            className="object-contain rounded-2xl shadow-2xl select-none"
             style={{ animation: 'zoomIn 0.25s ease-out' }}
             onClick={e => e.stopPropagation()}
           />
@@ -569,30 +839,30 @@ export default function Home() {
 /* ════════════════════════════════════
    CAR CARD — Floating Luxury
 ════════════════════════════════════ */
-function CarCard({ car, index = 0, onClick, onShare }: {
+function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavorite }: {
   car: any; index?: number; onClick?: () => void; onShare?: (e: React.MouseEvent) => void;
+  isFavorited?: boolean; onToggleFavorite?: (e: React.MouseEvent) => void;
 }) {
-  const isEager = index < 3;
   return (
     <div className="group relative cursor-pointer" onClick={onClick}>
       <div className="absolute -inset-1 rounded-[2rem] bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none" />
       <div className="relative rounded-[2rem] overflow-hidden border border-white/20 backdrop-blur-md bg-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.35)] group-hover:shadow-[0_20px_60px_rgba(0,0,0,0.55)] transition-all duration-500 group-hover:-translate-y-1 active:scale-[0.98]">
 
         <div className="relative h-[58vw] md:h-72 overflow-hidden">
-          <img
+          <Image
             src={Array.isArray(car.image) ? car.image[0] : car.image}
             alt={car.name}
-            loading={isEager ? "eager" : "lazy"}
-            fetchPriority={index === 0 ? "high" : isEager ? "auto" : "low"}
-            decoding="async"
-            className="w-full h-full object-cover transition-transform duration-[2s] group-hover:scale-105"
+            fill
+            sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+            priority={index < 3}
+            className="object-cover transition-transform duration-[2s] group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
 
           {/* Badges row */}
           <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
 
-            {/* VIP + Share دايرة تحتيه */}
+            {/* VIP + Share + Fave دايرة تحتيه */}
             <div className="flex flex-col items-start gap-2">
               {(car.isVIP === true || car.isVIP === 'true') && (
                 <div className="bg-[#D4AF37] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md">
@@ -600,7 +870,19 @@ function CarCard({ car, index = 0, onClick, onShare }: {
                   <span className="text-[8px] font-black tracking-[2px] uppercase">VIP Choice</span>
                 </div>
               )}
-              {/* ── Share button خارج الكارد ── */}
+              {/* ── Favorite Heart ── */}
+              <button
+                onClick={onToggleFavorite}
+                className={`w-8 h-8 rounded-full backdrop-blur-md border flex items-center justify-center transition-all duration-300 shadow-md ${
+                  isFavorited
+                    ? 'bg-red-500/20 border-red-400/50'
+                    : 'bg-white/20 border-white/30 hover:bg-white'
+                }`}
+                title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+              >
+                <Heart size={13} className={`transition-colors ${isFavorited ? 'text-red-400 fill-red-400' : 'text-white'}`} />
+              </button>
+              {/* ── Share button ── */}
               <button
                 onClick={onShare}
                 className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center hover:bg-white active:scale-90 transition-all duration-300 group/share shadow-md"
@@ -625,7 +907,9 @@ function CarCard({ car, index = 0, onClick, onShare }: {
         {/* Price strip */}
         <div className="flex items-center justify-between px-5 md:px-6 py-4 md:py-5 bg-black/60 backdrop-blur-sm">
           <div>
-            <p className="text-[8px] text-white/40 uppercase tracking-[3px] font-bold">Per Day</p>
+            <p className="text-[8px] text-white/40 uppercase tracking-[3px] font-bold">
+              {car.category === 'car_rental' ? 'Per Day' : car.category === 'flowers' ? 'Price' : 'Per Day'}
+            </p>
             <p className="text-lg md:text-xl font-bold text-white mt-0.5">
               {car.price} <span className="text-[10px] text-white/50 font-normal">EGP</span>
             </p>

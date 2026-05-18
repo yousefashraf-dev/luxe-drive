@@ -1,6 +1,7 @@
 import { Inter, Cairo } from 'next/font/google';
 import './globals.css';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import { AuthProvider } from '@/lib/AuthContext';
 const inter = Inter({ 
   subsets: ['latin'], 
   variable: '--font-inter',
@@ -24,9 +25,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="ZaFah" />
       </head>
-
-<body className={`${inter.variable} ${cairo.variable} antialiased`} suppressHydrationWarning>  {children}
-</body>
+      <body className={`${inter.variable} ${cairo.variable} antialiased`} suppressHydrationWarning>  
+        <AuthProvider>{children}</AuthProvider>
+      </body>
       
     </html>
   );
