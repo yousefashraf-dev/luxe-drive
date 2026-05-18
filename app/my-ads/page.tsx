@@ -173,12 +173,12 @@ function EditModal({ ad, onClose, onSaved }) {
                 for (const file of files) {
                   const fd = new FormData();
                   fd.append('file', file);
-                  fd.append('upload_preset', 'ml_default');
                   try {
-                    const res = await fetch(`https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`, { method: 'POST', body: fd });
+                    const res = await fetch('/api/upload', { method: 'POST', body: fd });
                     const data = await res.json();
-                    if (data.secure_url) setImages(p => [...p, data.secure_url]);
-                  } catch (err) { console.error('Upload failed', err); }
+                    if (data.url) setImages(p => [...p, data.url]);
+                    else alert('فشل رفع الصورة، حاول مرة أخرى');
+                  } catch (err) { alert('فشل في الاتصال بالخادم'); }
                 }
                 setUploading(false);
                 e.target.value = '';
