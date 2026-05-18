@@ -4,7 +4,7 @@ import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share2, Check, User, LogOut, Plus, Heart, Flower2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
-import { collection, getDocs, updateDoc, doc, increment } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, increment, query, where, setDoc, deleteDoc, serverTimestamp, orderBy, limit, startAfter } from 'firebase/firestore';
 import { useAuth } from '@/lib/AuthContext';
 import Link from 'next/link';
 
@@ -188,7 +188,8 @@ const modelInfo: Record<string, { brand: string; en: string }> = {
 ════════════════════════════════════════ */
 export default function Home() {
   const [cars, setCars]                 = useState<any[]>([]);
-  const [filteredCars, setFilteredCars] = useState<any[]>([]);
+  const [hasMore, setHasMore]           = useState(true);
+  const [loadingMore, setLoadingMore]   = useState(false);
   const [searchQuery, setSearchQuery]   = useState("");
   const [suggestions, setSuggestions]   = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -208,12 +209,29 @@ export default function Home() {
   const [driverFilter, setDriverFilter] = useState<'all' | 'with' | 'without'>('all');
   const [favorites, setFavorites] = useState<string[]>([]);
 
-  const { user, userProfile, loading: authLoading, isAdmin, signInWithGoogle, signOut } = useAuth();
+  const { user, userProfile, loading: authLoading, isAdmin, signOut } = useAuth();
 
   /* ── Favorites management ── */
   useEffect(() => {
     if (user) {
-      // For logged-in users, fetch from Firebase (implement later)
+      const migrateAndFetch = async () => {
+        try {
+          const localRaw = localStorage.getItem('zafah_favorites');
+          const localFavs: string[] = localRaw ? JSON.parse(localRaw) : [];
+          const q = query(collection(db, 'favorites'), where('userId', '==', user.uid));
+          const snap = await getDocs(q);
+          const firestoreFavs = snap.docs.map(d => d.data().carId);
+          const merged = [...new Set([...localFavs, ...firestoreFavs])];
+          setFavorites(merged);
+          for (const carId of merged) {
+            await setDoc(doc(db, 'favorites', `${user.uid}_${carId}`), {
+              userId: user.uid, carId, createdAt: serverTimestamp(),
+            });
+          }
+          localStorage.removeItem('zafah_favorites');
+        } catch (err) { console.error('Favorites sync error:', err); }
+      };
+      migrateAndFetch();
     } else {
       try {
         const stored = localStorage.getItem('zafah_favorites');
@@ -222,14 +240,26 @@ export default function Home() {
     }
   }, [user]);
 
-  const toggleFavorite = (carId: string) => {
+  const toggleFavorite = async (carId: string) => {
+    const isFav = favorites.includes(carId);
     setFavorites(prev => {
-      const updated = prev.includes(carId) ? prev.filter(id => id !== carId) : [...prev, carId];
+      const updated = isFav ? prev.filter(id => id !== carId) : prev.includes(carId) ? prev : [...prev, carId];
       if (!user) {
         try { localStorage.setItem('zafah_favorites', JSON.stringify(updated)); } catch {}
       }
       return updated;
     });
+    if (user) {
+      try {
+        if (isFav) {
+          await deleteDoc(doc(db, 'favorites', `${user.uid}_${carId}`));
+        } else {
+          await setDoc(doc(db, 'favorites', `${user.uid}_${carId}`), {
+            userId: user.uid, carId, createdAt: serverTimestamp(),
+          });
+        }
+      } catch (err) { console.error('Favorite toggle error:', err); }
+    }
   };
 
   const searchRef = useRef<HTMLDivElement>(null);
@@ -307,47 +337,67 @@ export default function Home() {
 
   const dismissBanner = () => { setShowInstallBanner(false); localStorage.setItem('pwa_banner_ts', String(Date.now())); };
 
-  /* ── Firebase + localStorage cache ── */
+  /* ── Pagination state ── */
+  const lastDocRef = useRef<any>(null);
+  const observerRef = useRef<HTMLDivElement>(null);
+  const PAGE_SIZE = 6;
+
+  const sortFn = (a: any, b: any) => {
+    const aVIP = a.isVIP === true || a.isVIP === 'true' ? 1 : 0;
+    const bVIP = b.isVIP === true || b.isVIP === 'true' ? 1 : 0;
+    return bVIP - aVIP;
+  };
+
+  const fetchCars = async () => {
+    setLoading(true);
+    try {
+      const q = query(collection(db, "cars"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+      const snap = await getDocs(q);
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const sorted = [...data].sort(sortFn);
+      setCars(sorted);
+      lastDocRef.current = snap.docs[snap.docs.length - 1] || null;
+      setHasMore(snap.docs.length === PAGE_SIZE);
+      setLoading(false);
+      try { localStorage.setItem('luxe_cars_cache', JSON.stringify({ data, ts: Date.now() })); } catch (_) {}
+    } catch (err) { console.error("Firebase:", err); setLoading(false); }
+  };
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore || !lastDocRef.current) return;
+    setLoadingMore(true);
+    try {
+      const q = query(
+        collection(db, "cars"),
+        orderBy("createdAt", "desc"),
+        startAfter(lastDocRef.current),
+        limit(PAGE_SIZE)
+      );
+      const snap = await getDocs(q);
+      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const sorted = [...data].sort(sortFn);
+      setCars(prev => [...prev, ...sorted]);
+      lastDocRef.current = snap.docs[snap.docs.length - 1] || null;
+      setHasMore(snap.docs.length === PAGE_SIZE);
+    } catch (err) { console.error("loadMore error:", err); }
+    finally { setLoadingMore(false); }
+  };
+
   useEffect(() => {
-    const sortFn = (a: any, b: any) => {
-      const aVIP = a.isVIP === true || a.isVIP === 'true' ? 1 : 0;
-      const bVIP = b.isVIP === true || b.isVIP === 'true' ? 1 : 0;
-      return bVIP - aVIP;
-    };
-
-    const fetchFromFirebase = async (updateCache = true) => {
-      try {
-        const snap   = await getDocs(collection(db, "cars"));
-        const data   = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        const sorted = [...data].sort(sortFn);
-        setCars(sorted); setFilteredCars(sorted); setLoading(false);
-        if (updateCache) {
-          try { localStorage.setItem('luxe_cars_cache', JSON.stringify({ data, ts: Date.now() })); } catch (_) {}
-        }
-      } catch (err) { console.error("Firebase:", err); setLoading(false); }
-    };
-
-    const fetchCars = async () => {
-      // 1) show cache instantly
-      try {
-        const raw = localStorage.getItem('luxe_cars_cache');
-        if (raw) {
-          const { data, ts } = JSON.parse(raw);
-          if (Date.now() - ts < 5 * 60 * 1000) {
-            const sorted = [...data].sort(sortFn);
-            setCars(sorted); setFilteredCars(sorted); setLoading(false);
-            // refresh silently in background
-            fetchFromFirebase(true);
-            return;
-          }
-        }
-      } catch (_) {}
-      // 2) no valid cache → fetch directly
-      await fetchFromFirebase(true);
-    };
-
     fetchCars();
   }, []);
+
+  /* ── IntersectionObserver for infinite scroll ── */
+  useEffect(() => {
+    if (!observerRef.current) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore && !loadingMore) {
+        loadMore();
+      }
+    }, { rootMargin: '200px' });
+    observer.observe(observerRef.current);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, cars]);
 
   /* ── search suggestions ── */
   useEffect(() => {
@@ -355,10 +405,10 @@ export default function Home() {
       const f = displayCars.slice(0, 5);
       setSuggestions(f); setShowSuggestions(true);
     } else { setSuggestions([]); setShowSuggestions(false); }
-  }, [searchQuery, cars]);
+  }, [searchQuery, activeFilter, driverFilter, favorites, cars]);
 
   const handleSelectCar = (car: any) => {
-    const images = Array.isArray(car.image) ? car.image : car.image ? [car.image] : ['/placeholder-car.jpg'];
+    const images = Array.isArray(car.image) ? car.image : car.image ? [car.image] : ['/placeholder-car.png'];
     setSelectedCar({ ...car, images });
     setCurrentImageIndex(0); setShowSuggestions(false); setIsClosing(false);
     updateDoc(doc(db, "cars", car.id), { views: increment(1) }).catch(() => {});
@@ -514,13 +564,13 @@ export default function Home() {
                 )}
               </div>
             ) : (
-              <button
-                onClick={signInWithGoogle}
-                className="flex items-center gap-2 bg-[#c5a059]/10 border border-[#c5a059]/30 px-4 py-2.5 rounded-full hover:bg-[#c5a059]/20 transition-all group"
-              >
-                <User size={13} className="text-[#c5a059]" />
-                <span className="text-[9px] font-bold tracking-[2px] uppercase text-[#c5a059]">Sign In</span>
-              </button>
+              <Link
+                  href="/login"
+                  className="flex items-center gap-2 bg-[#c5a059]/10 border border-[#c5a059]/30 px-4 py-2.5 rounded-full hover:bg-[#c5a059]/20 transition-all group"
+                >
+                  <User size={13} className="text-[#c5a059]" />
+                  <span className="text-[9px] font-bold tracking-[2px] uppercase text-[#c5a059]">Sign In</span>
+                </Link>
             )
           )}
         </div>
@@ -586,7 +636,7 @@ export default function Home() {
 
           {(loading || (cars.length === 0 && !searchQuery)) ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
-              {[1,2,3].map(i => (
+              {[1,2,3,4,5,6].map(i => (
                 <div key={i} className="rounded-[2rem] overflow-hidden border border-white/10 bg-white/10 backdrop-blur-md animate-pulse">
                   <div className="h-[58vw] md:h-72 bg-white/10" />
                   <div className="px-6 py-5 bg-black/40 flex items-center justify-between">
@@ -600,6 +650,7 @@ export default function Home() {
               ))}
             </div>
           ) : displayCars.length > 0 ? (
+            <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
               {displayCars.map((car, index) => (
                 <CarCard key={car.id} car={car} index={index}
@@ -610,6 +661,19 @@ export default function Home() {
                 />
               ))}
             </div>
+            {(hasMore || loadingMore) && (
+              <div ref={observerRef} className="flex justify-center py-12">
+                {loadingMore ? (
+                  <div className="flex items-center gap-3 text-white/40">
+                    <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                    <span className="text-[10px] uppercase tracking-[3px]">Loading more...</span>
+                  </div>
+                ) : (
+                  <div className="w-6 h-6" />
+                )}
+              </div>
+            )}
+            </>
           ) : (
             <p className="py-20 text-center text-white/40 font-serif italic">No vehicles matching your search found.</p>
           )}
@@ -680,13 +744,12 @@ export default function Home() {
               <div className="mb-1 pr-12 md:pr-0">
                 {/* اسم العربية */}
                 <h2
-                  className="font-serif text-3xl md:text-5xl font-light italic text-black leading-tight"
+                  className="font-serif text-3xl md:text-5xl font-semibold italic text-black leading-tight"
                   style={{ fontFamily: "'Playfair Display',Georgia,serif" }}
                 >
                   {selectedCar.name}
                 </h2>
-                <div className="h-[1px] w-14 bg-black/30 mt-3" />
-                <p className="text-[8px] text-zinc-400 uppercase tracking-[4px] mt-2 font-bold">Premium Class</p>
+                <p className="text-[9px] text-zinc-400 uppercase tracking-[4px] mt-2 font-bold">Premium Class</p>
 
                 {/* ── Share button — تحت الاسم مباشرة ── */}
                 <button
@@ -706,7 +769,7 @@ export default function Home() {
 
               {/* Description */}
               {selectedCar.description && (
-                <p className="text-zinc-500 text-sm leading-relaxed text-right font-light italic mt-4 md:mt-6 border-r-2 border-zinc-200 pr-4" dir="rtl">
+                <p className="text-zinc-600 text-sm leading-relaxed text-right font-medium italic mt-4 md:mt-6 border-r-2 border-zinc-300 pr-4" dir="rtl">
                   {selectedCar.description}
                 </p>
               )}
@@ -732,10 +795,10 @@ export default function Home() {
                       Availability Schedule
                     </p>
                     {/* Month + Year */}
-                    <p className="text-[11px] font-bold text-center text-black mb-1">
+                    <p className="text-[13px] font-extrabold text-center text-black mb-1">
                       {monthNames[month]} {year}
                     </p>
-                    <p className="text-[10px] text-center text-red-500 font-medium mb-4" dir="rtl">
+                    <p className="text-[11px] text-center text-red-500 font-bold mb-4" dir="rtl">
                       🔴 الأيام الحمراء محجوزة مسبقاً
                     </p>
 
@@ -758,12 +821,12 @@ export default function Home() {
                         return (
                           <div key={day} className="flex items-center justify-center">
                             <span className={`
-                              text-[10px] w-7 h-7 flex items-center justify-center rounded-full font-medium transition-all duration-200
+                              text-[11px] w-7 h-7 flex items-center justify-center rounded-full font-bold transition-all duration-200
                               ${booked
                                 ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.4)]'
                                 : isToday
                                   ? 'bg-black text-white font-bold'
-                                  : 'text-zinc-400'
+                                  : 'text-zinc-600'
                               }
                             `}>
                               {day}
@@ -904,18 +967,18 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
           </div>
         </div>
 
-        {/* Price strip */}
+          {/* Price strip */}
         <div className="flex items-center justify-between px-5 md:px-6 py-4 md:py-5 bg-black/60 backdrop-blur-sm">
           <div>
-            <p className="text-[8px] text-white/40 uppercase tracking-[3px] font-bold">
+            <p className="text-[9px] text-white/60 uppercase tracking-[3px] font-bold">
               {car.category === 'car_rental' ? 'Per Day' : car.category === 'flowers' ? 'Price' : 'Per Day'}
             </p>
-            <p className="text-lg md:text-xl font-bold text-white mt-0.5">
-              {car.price} <span className="text-[10px] text-white/50 font-normal">EGP</span>
+            <p className="text-xl md:text-2xl font-extrabold text-white mt-0.5">
+              {car.price} <span className="text-[11px] text-white/60 font-bold">EGP</span>
             </p>
           </div>
           <div className="flex items-center gap-2 bg-white/10 active:bg-white hover:bg-white group/btn rounded-2xl px-5 py-3 border border-white/20 transition-all duration-300">
-            <span className="text-[9px] font-bold uppercase tracking-[3px] text-white group-hover/btn:text-black transition-colors">View</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-[3px] text-white group-hover/btn:text-black transition-colors">View</span>
             <ChevronRight size={14} className="text-white group-hover/btn:text-black transition-colors" />
           </div>
         </div>

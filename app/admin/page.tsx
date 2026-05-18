@@ -12,7 +12,7 @@ import Link from 'next/link';
 export default function AdminDashboard() {
   const [cars, setCars] = useState([]);
   const [globalStats, setGlobalStats] = useState({ total_visits: 0 });
-  const { user, authLoading, isAdmin, signOut } = useAuth();
+  const { user, loading: authLoading, isAdmin, signOut } = useAuth();
   const router = useRouter();
 
   useEffect(() => {

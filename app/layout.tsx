@@ -1,6 +1,5 @@
 import { Inter, Cairo } from 'next/font/google';
 import './globals.css';
-import { SpeedInsights } from '@vercel/speed-insights/next';
 import { AuthProvider } from '@/lib/AuthContext';
 const inter = Inter({ 
   subsets: ['latin'], 

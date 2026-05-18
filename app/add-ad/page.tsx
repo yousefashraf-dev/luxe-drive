@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase';
 import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { CldUploadWidget } from 'next-cloudinary';
 import { ArrowLeft, Car, Flower2, DollarSign, Phone, MapPin, FileText, Image as ImageIcon, ChevronRight, ChevronLeft, X, User, Calendar } from 'lucide-react';
+import { formatPhone } from '@/lib/utils';
 
 const LOCATIONS = ['المنوفية', 'القاهرة', 'الجيزة', 'طنطا', 'المنصورة', 'بنها', 'شبين الكوم', 'الإسكندرية'];
 
@@ -104,8 +105,8 @@ export default function AddAdPage() {
         price,
         description,
         image: images,
-        phone: phone.replace(/\D/g, '').replace(/^0/, '20'),
-        whatsapp: whatsapp ? whatsapp.replace(/\D/g, '').replace(/^0/, '20') : '',
+        phone: formatPhone(phone),
+        whatsapp: whatsapp ? formatPhone(whatsapp) : '',
         location,
         bookedDays,
         category: type === 'flowers' ? 'flowers' : carType === 'wedding' ? 'car_wedding' : 'car_rental',

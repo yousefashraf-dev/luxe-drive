@@ -15,7 +15,7 @@ export default function LoginPage() {
     e.preventDefault();
     try {
       await signInWithEmailAndPassword(auth, email, password);
-      router.push('/admin');
+      router.push('/');
     } catch (error) {
       alert("بيانات الدخول غلط يا هندسة!");
     }
@@ -24,7 +24,7 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     try {
       await signInWithGoogle();
-      router.push('/admin');
+      router.push('/');
     } catch (error) {
       alert("فشل تسجيل الدخول بحساب Google");
     }

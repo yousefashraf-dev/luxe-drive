@@ -7,6 +7,7 @@ import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { CldUploadWidget } from 'next-cloudinary';
 import { ArrowLeft, Car, Eye, Calendar, DollarSign, Phone, FileText, Image as ImageIcon, Edit3, X, ChevronRight, ChevronLeft, Star, Save, Flower2, Heart } from 'lucide-react';
+import { formatPhone } from '@/lib/utils';
 
 const LOCATIONS = ['المنوفية', 'القاهرة', 'الجيزة', 'طنطا', 'المنصورة', 'بنها', 'شبين الكوم', 'الإسكندرية'];
 
@@ -72,8 +73,9 @@ function EditModal({ ad, onClose, onSaved }) {
     setSubmitting(true);
     try {
       await updateDoc(doc(db, "cars", ad.id), {
-        name, price, description, phone,
-        whatsapp: whatsapp || '',
+        name, price, description,
+        phone: formatPhone(phone),
+        whatsapp: whatsapp ? formatPhone(whatsapp) : '',
         location, image: images, bookedDays,
         updatedAt: serverTimestamp()
       });

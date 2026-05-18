@@ -1,5 +1,6 @@
 'use client';
 import { createContext, useContext, useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { auth, db } from '@/lib/firebase';
 import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut as firebaseSignOut, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp, FieldValue } from 'firebase/firestore';
@@ -32,6 +33,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -60,6 +62,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
+    const isIOS = typeof navigator !== 'undefined' &&
+      /iPad|iPhone|iPod/.test(navigator.userAgent);
+    if (isIOS) {
+      await signInWithRedirect(auth, provider);
+      return;
+    }
     try {
       await signInWithPopup(auth, provider);
     } catch (err: any) {
@@ -72,8 +80,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    getRedirectResult(auth).catch(() => {});
-  }, []);
+    getRedirectResult(auth).then((result) => {
+      if (result) {
+        if (result.user) setUser(result.user);
+        router.push('/');
+      }
+    }).catch((err) => {
+      if (err.code !== 'auth/no-redirect-data') {
+        console.warn('getRedirectResult error:', err);
+      }
+    });
+  }, [router]);
 
   const signOut = async () => {
     await firebaseSignOut(auth);
