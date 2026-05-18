@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { CldUploadWidget } from 'next-cloudinary';
+import { CldUploadButton } from 'next-cloudinary';
 import { ArrowLeft, Car, Eye, Calendar, DollarSign, Phone, FileText, Image as ImageIcon, Edit3, X, ChevronRight, ChevronLeft, Star, Save, Flower2, Heart } from 'lucide-react';
 import { formatPhone } from '@/lib/utils';
 
@@ -149,13 +149,10 @@ function EditModal({ ad, onClose, onSaved }) {
 
           <div>
             <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">الصور</label>
-            <CldUploadWidget uploadPreset="ml_default" onSuccess={(res) => setImages(p => [...p, res.info.secure_url])}>
-              {({ open }) => (
-                <button type="button" onClick={() => open()} className="w-full py-6 border-2 border-dashed border-zinc-200 rounded-[2rem] text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500 hover:border-black hover:text-zinc-400 transition-all flex flex-col items-center gap-3">
-                  <ImageIcon size={24} /> {images.length > 0 ? `${images.length} صور` : 'رفع صور'}
-                </button>
-              )}
-            </CldUploadWidget>
+            <CldUploadButton uploadPreset="ml_default" onSuccess={(res) => setImages(p => [...p, res.info.secure_url])}
+              className="w-full py-6 border-2 border-dashed border-zinc-200 rounded-[2rem] text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500 hover:border-black hover:text-zinc-400 transition-all flex flex-col items-center gap-3">
+              <ImageIcon size={24} /> {images.length > 0 ? `${images.length} صور` : 'رفع صور'}
+            </CldUploadButton>
             {images.length > 0 && (
               <div className="flex flex-wrap gap-3 mt-4">
                 {images.map((url, i) => (

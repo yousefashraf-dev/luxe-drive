@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { CldUploadWidget } from 'next-cloudinary';
+import { CldUploadButton } from 'next-cloudinary';
 import { ArrowLeft, Car, Flower2, DollarSign, Phone, MapPin, FileText, Image as ImageIcon, ChevronRight, ChevronLeft, X, User, Calendar } from 'lucide-react';
 import { formatPhone } from '@/lib/utils';
 
@@ -163,7 +163,7 @@ export default function AddAdPage() {
       };
 
       if (editMode && editId) {
-        const { createdAt, views, isVIP, status, ...updateFields } = adData;
+        const { createdAt, views, isVIP, status, userId, userEmail, ...updateFields } = adData;
         await updateDoc(doc(db, 'cars', editId), {
           ...updateFields,
           updatedAt: serverTimestamp(),
@@ -379,17 +379,13 @@ export default function AddAdPage() {
                 </div>
               )}
 
-              <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">الصور</label>
-                <CldUploadWidget uploadPreset="ml_default" onSuccess={(res) => setImages(p => [...p, res.info.secure_url])}>
-                  {({ open }) => (
-                    <button type="button" onClick={() => open()}
-                      className="w-full py-8 border-2 border-dashed border-white/10 rounded-[2rem] text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500 hover:border-white/30 hover:text-zinc-300 transition-all flex flex-col items-center gap-3">
-                      <ImageIcon size={28} />
-                      {images.length > 0 ? `${images.length} صور مرفوعة` : 'اضغط لرفع الصور'}
-                    </button>
-                  )}
-                </CldUploadWidget>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">الصور</label>
+                  <CldUploadButton uploadPreset="ml_default" onSuccess={(res) => setImages(p => [...p, res.info.secure_url])}
+                    className="w-full py-8 border-2 border-dashed border-white/10 rounded-[2rem] text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-500 hover:border-white/30 hover:text-zinc-300 transition-all flex flex-col items-center gap-3">
+                    <ImageIcon size={28} />
+                    {images.length > 0 ? `${images.length} صور مرفوعة` : 'اضغط لرفع الصور'}
+                  </CldUploadButton>
                 {images.length > 0 && (
                   <div className="flex flex-wrap gap-3 mt-4">
                     {images.map((url, i) => (
