@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { CldUploadWidget } from 'next-cloudinary';
 import { ArrowLeft, Car, Flower2, DollarSign, Phone, MapPin, FileText, Image as ImageIcon, ChevronRight, ChevronLeft, X, User, Calendar } from 'lucide-react';
 import { formatPhone } from '@/lib/utils';
@@ -64,6 +64,8 @@ function CalendarPicker({ bookedDays, onToggle }) {
 export default function AddAdPage() {
   const { user, userProfile, loading: authLoading } = useAuth();
   const router = useRouter();
+  const [editId, setEditId] = useState<string | null>(null);
+  const [editMode, setEditMode] = useState(false);
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
 
@@ -90,6 +92,45 @@ export default function AddAdPage() {
   useEffect(() => {
     if (!authLoading && !user) router.push('/');
   }, [authLoading, user, router]);
+
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get('edit');
+    if (id) setEditId(id);
+  }, []);
+
+  useEffect(() => {
+    if (!editId) return;
+    const loadAd = async () => {
+      try {
+        const snap = await getDoc(doc(db, 'cars', editId));
+        if (snap.exists()) {
+          const data = snap.data();
+          if (data.category === 'flowers') {
+            setType('flowers');
+            setBouquetName(data.bouquetName || '');
+          } else {
+            setType('car');
+            setCarType(data.category === 'car_wedding' ? 'wedding' : 'rental');
+            setDriver(data.driver || 'without');
+            setName(data.name || '');
+          }
+          setPrice(data.price || '');
+          setPhone(data.phone || '');
+          setWhatsapp(data.whatsapp || '');
+          setDescription(data.description || '');
+          setLocation(data.location || '');
+          setImages(data.image || []);
+          setBookedDays(data.bookedDays || []);
+          setEditMode(true);
+          setStep(3);
+        }
+      } catch (err) {
+        console.error('Failed to load ad:', err);
+        alert('فشل تحميل بيانات الإعلان');
+      }
+    };
+    loadAd();
+  }, [editId]);
 
   const handleToggleDay = (day: number) => {
     setBookedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
@@ -120,8 +161,19 @@ export default function AddAdPage() {
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       };
-      await addDoc(collection(db, "cars"), adData);
-      alert('تم إرسال الإعلان! ✅ في انتظار مراجعة الإدارة.');
+
+      if (editMode && editId) {
+        const { createdAt, views, isVIP, status, ...updateFields } = adData;
+        await updateDoc(doc(db, 'cars', editId), {
+          ...updateFields,
+          updatedAt: serverTimestamp(),
+        });
+        alert('تم تعديل الإعلان! ✅');
+      } else {
+        await addDoc(collection(db, 'cars'), adData);
+        alert('تم إرسال الإعلان! ✅ في انتظار مراجعة الإدارة.');
+      }
+
       router.push('/my-ads');
     } catch (err) {
       console.error(err);
@@ -148,7 +200,7 @@ export default function AddAdPage() {
           <ArrowLeft size={16} />
         </button>
         <div className="flex-1">
-          <p className="font-serif text-lg italic">New Listing</p>
+          <p className="font-serif text-lg italic">{editMode ? 'Edit Listing' : 'New Listing'}</p>
           <div className="h-1 bg-zinc-800 rounded-full mt-2 overflow-hidden">
             <div className="h-full bg-[#c5a059] rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
@@ -353,7 +405,7 @@ export default function AddAdPage() {
 
               <button type="submit" disabled={submitting}
                 className="w-full bg-[#c5a059] text-black py-5 rounded-[2rem] font-bold text-[12px] uppercase tracking-[0.3em] shadow-2xl hover:bg-[#d4af37] transition-all active:scale-[0.98] disabled:opacity-50">
-                {submitting ? 'جاري الإرسال...' : 'إرسال الإعلان للمراجعة 📨'}
+                {submitting ? 'جاري الإرسال...' : editMode ? 'حفظ التعديلات 💾' : 'إرسال الإعلان للمراجعة 📨'}
               </button>
 
               {type === 'car' && (
