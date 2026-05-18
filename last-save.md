@@ -241,7 +241,7 @@ git push origin main
 
 ```bash
 git add .
-git commit -m "v3.0: fix Google Sign-In — remove getRedirectResult, add select_account prompt, better error messages"
+git commit -m "v3.0: fix Google Sign-In — getRedirectResult + iOS redirect + select_account + error messages"
 git push origin main
 ```
 
@@ -249,7 +249,15 @@ git push origin main
 
 | المشكلة | الملف | الحل |
 |---------|-------|------|
-| **`getRedirectResult` بيتعارض مع `onAuthStateChanged`** | `lib/AuthContext.tsx` | إزالة useEffect بتاع `getRedirectResult` بالكامل — `onAuthStateChanged` هو المسؤول عن كشف المستخدم بعد الـ redirect |
+| **iOS بعد الـ redirect بيفضل واقف (مش بيسجل)** | `lib/AuthContext.tsx` | إعادة `getRedirectResult` — لازم عشان iOS يكمل تسجيل الدخول بعد redirect بدون `setUser` متكرر (بيستخدم `window.location.href` بدل `router.push` عشان dependent) |
 | **مفيش `select_account`** | `lib/AuthContext.tsx` | إضافة `provider.setCustomParameters({ prompt: 'select_account' })` عشان يجبر المستخدم يختار حساب جوجل دايمًا |
 | **`router.push('/')` بيتنفذ بعد `signInWithRedirect`** | `app/login/page.tsx` | شيل `router.push('/')` من `handleGoogleSignIn` — الـ `useEffect` في اللوجين بيديركت لوحده |
 | **رسالة خطأ عامة "فشل" ملهاش معنى** | `app/login/page.tsx` | إضافة رسايل خطأ بالعربي حسب `error.code` (مش مفعل، popup ممنوع، domain مش مضاف، إلخ) |
+| **`zafah.vercel.app` مش مضاف في Authorized domains** | Firebase Console | إضافة `zafah.vercel.app` في Firebase > Authentication > Settings > Authorized domains |
+
+## فحص التسليم
+
+- [x] Google Sign-In على اللابتوب (Popup) — شغال ✅
+- [x] Google Sign-In على iPhone (Redirect + getRedirectResult) — شغال ✅
+- [x] رسايل خطأ بالعربي حسب الكود
+- [x] `select_account` بيظهر اختيار الحساب دايمًا

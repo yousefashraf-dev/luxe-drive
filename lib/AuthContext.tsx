@@ -1,7 +1,7 @@
 'use client';
 import { createContext, useContext, useEffect, useState } from 'react';
 import { auth, db } from '@/lib/firebase';
-import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, onAuthStateChanged, signOut as firebaseSignOut, User } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, onAuthStateChanged, signOut as firebaseSignOut, User } from 'firebase/auth';
 import { doc, getDoc, setDoc, serverTimestamp, Timestamp, FieldValue } from 'firebase/firestore';
 
 const ADMIN_EMAILS = ['yousefgaafer85@gmail.com'];
@@ -56,6 +56,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    getRedirectResult(auth).then((result) => {
+      if (result?.user) {
+        window.location.href = '/';
+      }
+    }).catch((err) => {
+      if (err.code !== 'auth/no-redirect-data') {
+        console.warn('getRedirectResult:', err.code || err);
+      }
+    });
   }, []);
 
   const signInWithGoogle = async () => {
