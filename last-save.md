@@ -232,3 +232,24 @@ git push origin main
 | `components/ChatWidget.tsx` | تحديث — تعطيل كامل |
 | `app/api/chat/route.ts` | **حذف** |
 | `public/placeholder-car.png` | **جديد**
+
+---
+
+# تحديث 18 مايو 2026 — الدفعة الثالثة (v3.0): إصلاح Google Sign-In
+
+## أوردر الرفع
+
+```bash
+git add .
+git commit -m "v3.0: fix Google Sign-In — remove getRedirectResult, add select_account prompt, better error messages"
+git push origin main
+```
+
+## التعديلات
+
+| المشكلة | الملف | الحل |
+|---------|-------|------|
+| **`getRedirectResult` بيتعارض مع `onAuthStateChanged`** | `lib/AuthContext.tsx` | إزالة useEffect بتاع `getRedirectResult` بالكامل — `onAuthStateChanged` هو المسؤول عن كشف المستخدم بعد الـ redirect |
+| **مفيش `select_account`** | `lib/AuthContext.tsx` | إضافة `provider.setCustomParameters({ prompt: 'select_account' })` عشان يجبر المستخدم يختار حساب جوجل دايمًا |
+| **`router.push('/')` بيتنفذ بعد `signInWithRedirect`** | `app/login/page.tsx` | شيل `router.push('/')` من `handleGoogleSignIn` — الـ `useEffect` في اللوجين بيديركت لوحده |
+| **رسالة خطأ عامة "فشل" ملهاش معنى** | `app/login/page.tsx` | إضافة رسايل خطأ بالعربي حسب `error.code` (مش مفعل، popup ممنوع، domain مش مضاف، إلخ) |

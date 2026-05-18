@@ -28,10 +28,16 @@ export default function LoginPage() {
   const handleGoogleSignIn = async () => {
     try {
       await signInWithGoogle();
-      router.push('/');
     } catch (error: any) {
       console.error('Google sign-in failed:', error.code || error);
-      alert("فشل تسجيل الدخول بحساب Google");
+      const messages: Record<string, string> = {
+        'auth/operation-not-allowed': 'تسجيل الدخول بجوجل غير مفعل في Firebase Console',
+        'auth/popup-blocked': 'تم منع النافذة المنبثقة، سمح للنوافذ المنبثقة للموقع وحاول تاني',
+        'auth/popup-closed-by-user': 'تم إغلاق النافذة قبل إكمال التسجيل',
+        'auth/unauthorized-domain': 'الموقع مش مضاف في النطاقات المسموحة في Firebase',
+        'auth/cancelled-popup-request': 'تم إلغاء الطلب، حاول تاني',
+      };
+      alert(messages[error.code] || `فشل تسجيل الدخول بحساب Google (${error.code})`);
     }
   };
 
