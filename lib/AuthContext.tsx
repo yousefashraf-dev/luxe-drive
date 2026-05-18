@@ -62,15 +62,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = async () => {
     const provider = new GoogleAuthProvider();
+    const isStandalone = typeof window !== 'undefined' &&
+      window.matchMedia('(display-mode: standalone)').matches;
     const isIOS = typeof navigator !== 'undefined' &&
       /iPad|iPhone|iPod/.test(navigator.userAgent);
-    if (isIOS) {
-      await signInWithRedirect(auth, provider);
-      return;
-    }
     try {
+      if (isIOS || isStandalone) {
+        await signInWithRedirect(auth, provider);
+        return;
+      }
       await signInWithPopup(auth, provider);
     } catch (err: any) {
+      console.error('Google sign-in error:', err.code || err, err.message || err);
       if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
         await signInWithRedirect(auth, provider);
       } else {
@@ -86,9 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.push('/');
       }
     }).catch((err) => {
-      if (err.code !== 'auth/no-redirect-data') {
-        console.warn('getRedirectResult error:', err);
-      }
+      if (err.code === 'auth/no-redirect-data') return;
+      console.warn('getRedirectResult error:', err.code || err, err.message || err);
     });
   }, [router]);
 

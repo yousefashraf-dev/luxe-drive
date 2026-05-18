@@ -129,3 +129,106 @@ git push origin main
 ## ملحوظة
 
 ChatWidget لسه مقفول بـ `return null` — لو عاوز تشغله محتاج n8n على السيرفر.
+
+---
+
+# تحديث 18 مايو 2026 — الدفعة الثانية (v2.0)
+
+## أوردر الرفع
+
+```bash
+git add .
+git commit -m "v2.0: auth fixes, favorites Firebase, infinite scroll, phone formatting, UX improvements"
+git push origin main
+```
+
+## التعديلات اللي حصلت
+
+### 1️⃣ تسجيل الدخول — إصلاح شامل
+
+| المشكلة | الملف | الحل |
+|---------|-------|------|
+| **Safari iOS Popup ممنوع** | `lib/AuthContext.tsx` | كشف iOS + Standalone (PWA) واستخدام `signInWithRedirect` مباشرة |
+| **Popup بيفشل وفي خطأ تاني** | `lib/AuthContext.tsx` | تسجيل الـ error في الكونسول + تحسين معالجة الأخطاء |
+| **`getRedirectResult` مش بينقل المستخدم** | `lib/AuthContext.tsx` | `router.push('/')` بعد نجاح الـ redirect + تحسين الـ catch |
+| **بعد ما يسجل login — مش بينزل تحت** | `app/login/page.tsx` | `useEffect` auto-redirect لو المستخدم authenticated خلاص |
+| **Admin page كانت بتعمل loop** | `app/admin/page.tsx` | تصحيح `authLoading` → `loading: authLoading` (كان متغير غلط) |
+| **Sign In في الهوم بيشغل Google مباشرة** | `app/page.tsx` | تغيير لـ `<Link href="/login">` عشان المستخدم يقدر يستخدم إيميل/باسوورد |
+
+### 2️⃣ المفضلة — Firebase للمسجلين
+
+| المشكلة | الملف | الحل |
+|---------|-------|------|
+| **المفضلة مش شغالة للمسجلين** | `app/page.tsx` | إضافة كوليكشن `favorites` في Firestore — `{ userId, carId, createdAt }` |
+| **ترحيل localStorage → Firebase** | `app/page.tsx` | عند تسجيل الدخول، دمج المفضلة المحلية مع Firebase وتفريغ localStorage |
+| **Toggle favorites** | `app/page.tsx` | المسجل: addDoc/deleteDoc في Firebase. الضيف: localStorage |
+| **Race condition** | `app/page.tsx` | استخدام `setFavorites(prev => ...)` مع localStorage جوه الـ callback |
+
+### 3️⃣ Infinite Scroll + Pagination
+
+| الميزة | الملف | التفاصيل |
+|--------|-------|----------|
+| 6 عربيات كل شحنة | `app/page.tsx` | `query(cars, orderBy("createdAt", "desc"), limit(6))` |
+| تحميل تلقائي | `app/page.tsx` | `IntersectionObserver` — لما يوصل لآخر حاجة، يجيب 6 تانيين |
+| Loader | `app/page.tsx` | Spinner + نص "Loading more..." تحت القائمة |
+| إلغاء الكاش القديم | `app/page.tsx` | إزالة cache system (استبدل بـ pagination) |
+
+### 4️⃣ رقم التليفون — تنسيق موحد
+
+| الملف | التغيير |
+|-------|---------|
+| `lib/utils.ts` (**جديد**) | `formatPhone()` دالة: تظبط `+2010` / `010` / `2010` / `10` كلهم لـ `2010...` |
+| `app/add-ad/page.tsx` | استخدام `formatPhone()` عند الإضافة |
+| `app/my-ads/page.tsx` | استخدام `formatPhone()` عند التعديل |
+
+### 5️⃣ Search Suggestions
+
+| المشكلة | الحل |
+|---------|------|
+| الـ `useEffect` مش متابع `activeFilter`, `driverFilter`, `favorites` | إضافة كل الـ dependencies للـ useEffect عشان الـ suggestions تبقى up-to-date |
+
+### 6️⃣ شكل المودال — تحسينات
+
+| التغيير | السطر |
+|---------|-------|
+| اسم العربية: `font-semibold` (كان `font-light`) | `page.tsx:683` |
+| إزالة الخط الـ تحت الاسم (الـ `<div>`) | `page.tsx` |
+| الوصف: `font-medium` ولون أغمق | `page.tsx` |
+| السعر في الكارد: `font-extrabold text-2xl` | `page.tsx` |
+| أيام التقويم: `font-bold` + أوضح | `page.tsx` |
+
+### 7️⃣ Chat API + SpeedInsights — إزالة
+
+| الملف | الإجراء |
+|-------|---------|
+| `app/api/chat/route.ts` | حذف الملف بالكامل |
+| `components/ChatWidget.tsx` | تعطيل (export default function مع return null) |
+| `app/layout.tsx` | إزالة `import { SpeedInsights }` |
+
+### 8️⃣ موارد جديدة
+
+| الملف | الوظيفة |
+|-------|---------|
+| `public/placeholder-car.png` | صورة placeholder للعربيات اللي ملهاش صور |
+
+### 9️⃣ ملفات جديدة
+
+| الملف | الوظيفة |
+|-------|---------|
+| `lib/utils.ts` | دوال مساعدة (`formatPhone`) |
+
+### 🔟 ملخص التغييرات (v2)
+
+| الملف | نوع التغيير |
+|-------|------------|
+| `lib/AuthContext.tsx` | تحديث — Google Auth + Redirect + error handling |
+| `lib/utils.ts` | **جديد** — دوال مساعدة |
+| `app/page.tsx` | تحديث — Infinite Scroll + Favorites Firebase + Search + شكل |
+| `app/login/page.tsx` | تحديث — Auto-redirect + error logging |
+| `app/admin/page.tsx` | تحديث — Fix `loading` alias |
+| `app/add-ad/page.tsx` | تحديث — `formatPhone()` |
+| `app/my-ads/page.tsx` | تحديث — `formatPhone()` في التعديل |
+| `app/layout.tsx` | تحديث — إزالة SpeedInsights |
+| `components/ChatWidget.tsx` | تحديث — تعطيل كامل |
+| `app/api/chat/route.ts` | **حذف** |
+| `public/placeholder-car.png` | **جديد**
