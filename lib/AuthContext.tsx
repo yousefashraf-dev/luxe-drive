@@ -75,10 +75,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     provider.setCustomParameters({ prompt: 'select_account' });
     const isStandalone = typeof window !== 'undefined' &&
       window.matchMedia('(display-mode: standalone)').matches;
-    const isIOS = typeof navigator !== 'undefined' &&
-      /iPad|iPhone|iPod/.test(navigator.userAgent);
 
-    if (isIOS || isStandalone) {
+    if (isStandalone) {
       await signInWithRedirect(auth, provider);
       return;
     }
