@@ -245,6 +245,18 @@ export default function MyAdsPage() {
     const q = query(collection(db, "cars"), where("userId", "==", user.uid));
     const unsub = onSnapshot(q, (snap) => {
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const suspendedRefs: Promise<void>[] = [];
+      data.forEach(ad => {
+        if (ad.status !== 'active') return;
+        if (!ad.expiryDate) return;
+        const exp = ad.expiryDate.toDate ? ad.expiryDate.toDate() : new Date(ad.expiryDate);
+        if (Date.now() > exp.getTime()) {
+          suspendedRefs.push(updateDoc(doc(db, "cars", ad.id), { status: 'suspended', updatedAt: serverTimestamp() }));
+        }
+      });
+      if (suspendedRefs.length > 0) {
+        Promise.all(suspendedRefs).catch(() => {});
+      }
       setMyCars(data.sort((a, b) => {
         const aTime = a.createdAt?.toMillis?.() || a.createdAt || 0;
         const bTime = b.createdAt?.toMillis?.() || b.createdAt || 0;
@@ -344,6 +356,12 @@ export default function MyAdsPage() {
                         className="flex items-center justify-center gap-2 px-6 py-4 bg-black text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 transition-all shadow-sm active:scale-95">
                         <Edit3 size={14} /> تعديل
                       </button>
+                      {(ad.status !== 'active' || (dLeft !== null && dLeft <= 0)) && (
+                        <a href={`https://wa.me/201095976766?text=${encodeURIComponent('عاوز أجدد إعلان ' + ad.name)}`} target="_blank"
+                          className="flex items-center justify-center gap-2 px-6 py-4 bg-[#25D366] text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-[#20bd5a] transition-all shadow-sm active:scale-95">
+                          🔄 جدد الإعلان
+                        </a>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -57,14 +57,24 @@ export default function AdminDashboard() {
           <div className="h-[1px] w-20 bg-zinc-800 mx-auto"></div>
           <p className="text-zinc-500 text-[10px] mt-4 uppercase tracking-widest">Admin Verification</p>
         </div>
-      </div>
-    );
+    </div>
+  );
   }
+
+  const daysLeft = (car) => {
+    if (!car.expiryDate) return null;
+    const exp = car.expiryDate.toDate ? car.expiryDate.toDate() : new Date(car.expiryDate);
+    return Math.ceil((exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  };
 
   const carAds = cars.filter(c => c.category !== 'flowers' && !c.bouquetName);
   const flowerAds = cars.filter(c => c.category === 'flowers' || c.bouquetName);
 
-  const AdCard = (car) => (
+  const AdCard = (car) => {
+    const dLeft = daysLeft(car);
+    const expiryColor = dLeft === null ? '' : dLeft > 7 ? 'text-green-600' : dLeft > 0 ? 'text-yellow-600' : 'text-red-600';
+    const expiryBg = dLeft === null ? '' : dLeft > 7 ? 'bg-green-50' : dLeft > 0 ? 'bg-yellow-50' : 'bg-red-50';
+    return (
     <div key={car.id} className="bg-white p-6 rounded-[2.5rem] shadow-sm border border-gray-50 flex flex-col md:flex-row justify-between items-center gap-8 hover:shadow-xl hover:-translate-y-1 transition-all duration-500 group">
       <div className="flex items-center gap-8 w-full">
         <div className="relative overflow-hidden rounded-[2rem] h-32 w-44 shadow-lg">
@@ -84,6 +94,11 @@ export default function AdminDashboard() {
               {car.status === 'active' ? 'منشور' : 'معلق'}
             </span>
             {car.isVIP && <span className="bg-yellow-400 text-black px-2 py-1 rounded-full text-[8px] font-bold tracking-widest">VIP</span>}
+            {dLeft !== null && (
+              <span className={`px-2 py-1 rounded-full text-[8px] font-bold ${expiryColor} ${expiryBg}`}>
+                {dLeft > 0 ? `⏳ ${dLeft} يوم` : '🔴 منتهي'}
+              </span>
+            )}
           </div>
           <div className="flex flex-wrap gap-4 items-center">
             <p className="text-xs font-bold uppercase tracking-[0.15em] text-zinc-400">{car.price} EGP</p>
@@ -129,6 +144,7 @@ export default function AdminDashboard() {
       </div>
     </div>
   );
+  };
 
   return (
     <div className="min-h-screen bg-[#FAF9F6] p-6 md:p-12 text-black font-sans" dir="rtl">

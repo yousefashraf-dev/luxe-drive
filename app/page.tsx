@@ -381,8 +381,6 @@ export default function Home() {
       setHasMore(snap.docs.length === PAGE_SIZE);
       setLoading(false);
       try { localStorage.setItem('luxe_cars_cache', JSON.stringify({ data, ts: Date.now() })); } catch (_) {}
-      const validIds = new Set(data.map(c => c.id));
-      setFavorites(prev => prev.filter(id => validIds.has(id)));
     } catch (err) { console.error("Firebase:", err); setLoading(false); }
   };
 
@@ -625,7 +623,7 @@ export default function Home() {
               { key: 'wedding', label: '🎊 زفه', icon: null },
               { key: 'rental', label: '🚙 إيجار', icon: null },
               { key: 'flowers', label: '💐 ورد', icon: null },
-              { key: 'favorites', label: `❤️ مفضلة (${favorites.length})`, icon: null },
+              { key: 'favorites', label: `❤️ مفضلة (${cars.filter(c => favorites.includes(c.id)).length})`, icon: null },
             ].map(f => (
               <button key={f.key} onClick={() => setActiveFilter(f.key as any)}
                 className={`px-5 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-[2px] transition-all border ${
