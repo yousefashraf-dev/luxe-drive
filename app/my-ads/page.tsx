@@ -366,7 +366,7 @@ export default function MyAdsPage() {
                           <span>{ad.views || 0} مشاهدة</span>
                         </div>
                         {ad.category === 'trip' && ad.fromLocation && ad.toLocation ? (
-                          <span>🗺️ {ad.fromLocation} → {ad.toLocation}</span>
+                          <span>🗺️ <span dir="ltr">{ad.fromLocation} → {ad.toLocation}</span></span>
                         ) : ad.location ? (
                           <span>📍 {ad.location}</span>
                         ) : null}

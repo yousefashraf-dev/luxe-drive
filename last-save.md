@@ -577,3 +577,43 @@ git push origin main
 | `app/admin/page.tsx` | إضافة قسم Trips مع counter + Navigation icon |
 | `app/my-ads/page.tsx` | عرض مسار المشاوير + EditModal يدعم trips |
 | `last-save.md` | توثيق التعديلات |
+
+---
+
+# تحديث 19 مايو 2026 — v7.1: Fixes — موبايل TripCard + Lightbox X button
+
+## المشاكل
+- TripCard على الموبايل: النص والأزرار بتتقطع بسبب ضيق المساحة
+- Lightbox: زرار X مش باين (شفاف) وممكن يتغطى بالصورة
+
+## التعديلات — `app/page.tsx`
+
+### TripCard — تحسين الموبايل
+
+| العنصر | قبل | بعد |
+|-------|------|-----|
+| عرض الصورة | `w-[130px]` | `w-[95px]` |
+| ارتفاع الصورة | `min-h-[150px]` | `min-h-[120px]` |
+| Padding المحتوى | `p-4` | `p-2.5` |
+| اسم المشوار | `text-lg` | `text-sm` |
+| أيقونة القلب | `w-8 h-8` | `w-7 h-7` |
+| زرار واتساب/اتصال | `px-3 py-2 text-[8px]` | `px-2 py-1.5 text-[7px]` |
+| صف السعر + الأزرار | `flex justify-between` (جمب بعض) | `flex-col` موبايل — السعر فوق، الأزرار تحت |
+| الوصف | `text-[11px]` | `text-[10px]` |
+| المسافة بين العناصر | `mt-4` | `mt-2` |
+
+### Lightbox — زرار X واضح
+
+| قبل | بعد |
+|-----|------|
+| `bg-white/10` (شفاف — مش باين) | `bg-black/70 border border-white/30 shadow-lg` |
+| `top-6 right-6` | `top-4 right-4` |
+| `w-12 h-12` | `w-10 h-10` |
+| مفيش z-index محدد | `z-20` (فوق الصورة) |
+
+## الملفات المعدلة
+
+| الملف | التغيير |
+|-------|---------|
+| `app/page.tsx` | TripCard mobile layout + lightbox X button fix |
+| `last-save.md` | توثيق التعديلات |

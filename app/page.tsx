@@ -837,7 +837,7 @@ export default function Home() {
 
               {/* ── Trip route info ── */}
               {selectedCar.category === 'trip' && (selectedCar.fromLocation || selectedCar.toLocation) && (
-                <div className="mt-5 bg-white rounded-[1.2rem] border border-zinc-200 shadow-sm p-5" dir="rtl">
+                <div className="mt-5 bg-white rounded-[1.2rem] border border-zinc-200 shadow-sm p-5">
                   <div className="flex items-center gap-4 justify-center">
                     {selectedCar.fromLocation && (
                       <div className="text-center">
@@ -941,9 +941,6 @@ export default function Home() {
       {/* ════ ZOOM LIGHTBOX ════ */}
       {zoomedImage && (
         <div className="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out" onClick={() => setZoomedImage(null)}>
-          <button className="absolute top-6 right-6 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all group z-10" onClick={() => setZoomedImage(null)}>
-            <X size={22} className="transition-transform duration-500 group-hover:rotate-90" />
-          </button>
           <Image src={zoomedImage} alt="Zoomed"
             fill
             className="object-contain rounded-2xl shadow-2xl select-none"
@@ -952,6 +949,11 @@ export default function Home() {
           />
           <p className="absolute bottom-6 text-white/40 text-[10px] tracking-[4px] uppercase">اضغط خارج الصورة للإغلاق</p>
         </div>
+      )}
+      {zoomedImage && (
+        <button className="fixed top-4 right-4 z-[301] w-12 h-12 rounded-full bg-black/70 border border-white/30 flex items-center justify-center text-white shadow-lg hover:bg-white/20 transition-all" onClick={() => setZoomedImage(null)}>
+          <X size={22} className="transition-transform duration-500 hover:rotate-90" />
+        </button>
       )}
 
       {/* ════ FOOTER ════ */}
@@ -1076,7 +1078,6 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
   trip: any; index?: number;
   isFavorited?: boolean; onToggleFavorite?: (e: React.MouseEvent) => void;
 }) {
-  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
   const imageUrl = optimizeImage(
     Array.isArray(trip.image) ? trip.image[0] : trip.image || '/placeholder-car.png',
     400
@@ -1088,8 +1089,7 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
       <div className="group relative bg-[#0a0a0a] backdrop-blur-xl border border-white/15 rounded-[1.8rem] md:rounded-[2rem] overflow-hidden shadow-2xl hover:shadow-[0_20px_60px_rgba(0,0,0,0.7)] hover:-translate-y-0.5 transition-all duration-500">
         <div className="flex flex-row">
           <div
-            className="relative w-[95px] md:w-[200px] flex-shrink-0 overflow-hidden cursor-pointer rounded-r-[1.8rem] md:rounded-r-[2rem]"
-            onClick={() => setZoomedImage(Array.isArray(trip.image) ? trip.image[0] : trip.image || '/placeholder-car.png')}
+            className="relative w-[95px] md:w-[200px] flex-shrink-0 overflow-hidden rounded-r-[1.8rem] md:rounded-r-[2rem]"
           >
             <div className="h-full min-h-[120px] md:min-h-[200px] relative">
               <Image
@@ -1115,7 +1115,7 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
               </h3>
               {(trip.fromLocation || trip.toLocation) && (
                 <p className="text-indigo-300/80 text-[9px] md:text-[12px] mt-0.5 md:mt-1">
-                  🗺️ {trip.fromLocation || '...'} → {trip.toLocation || '...'}
+                  🗺️ <span dir="ltr">{trip.fromLocation || '...'} → {trip.toLocation || '...'}</span>
                 </p>
               )}
               {trip.description && (
@@ -1145,20 +1145,6 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
         </div>
       </div>
 
-      {zoomedImage && (
-        <div className="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out"
-          onClick={() => setZoomedImage(null)}>
-          <button className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/70 border border-white/30 flex items-center justify-center text-white shadow-lg hover:bg-white/20 transition-all z-20"
-            onClick={() => setZoomedImage(null)}>
-            <X size={18} />
-          </button>
-          <Image src={zoomedImage} alt="Zoomed" fill
-            className="object-contain rounded-2xl shadow-2xl select-none"
-            style={{ animation: 'zoomIn 0.25s ease-out' }}
-            onClick={e => e.stopPropagation()} />
-          <p className="absolute bottom-6 text-white/40 text-[10px] tracking-[4px] uppercase">اضغط خارج الصورة للإغلاق</p>
-        </div>
-      )}
     </>
   );
 }
