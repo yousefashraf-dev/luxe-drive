@@ -50,47 +50,28 @@ function compressImage(file: File): Promise<Blob> {
   });
 }
 
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = () => reject(new Error('فشل تحويل الصورة'));
+    reader.readAsDataURL(blob);
+  });
+}
+
 export async function uploadWithProgress(
   file: File,
   onProgress?: (progress: UploadProgress) => void
 ): Promise<string> {
+  onProgress?.({ fileName: file.name, loaded: 0, total: 100, percent: 10 });
+
   const compressed = await compressImage(file);
 
-  return new Promise((resolve, reject) => {
-    const formData = new FormData();
-    formData.append('file', compressed, file.name.replace(/\.[^.]+$/, '.jpg'));
+  onProgress?.({ fileName: file.name, loaded: 50, total: 100, percent: 50 });
 
-    const xhr = new XMLHttpRequest();
+  const base64 = await blobToBase64(compressed);
 
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable && onProgress) {
-        onProgress({
-          fileName: file.name,
-          loaded: e.loaded,
-          total: e.total,
-          percent: Math.round((e.loaded / e.total) * 100),
-        });
-      }
-    };
+  onProgress?.({ fileName: file.name, loaded: 100, total: 100, percent: 100 });
 
-    xhr.onload = () => {
-      try {
-        const data = JSON.parse(xhr.responseText);
-        if (xhr.status === 200 && data.url) {
-          resolve(data.url);
-        } else {
-          reject(new Error(data.error || 'فشل الرفع'));
-        }
-      } catch {
-        reject(new Error('خطأ في استجابة الخادم'));
-      }
-    };
-
-    xhr.onerror = () => reject(new Error('فشل الاتصال بالخادم'));
-    xhr.onabort = () => reject(new Error('تم إلغاء الرفع'));
-
-    xhr.timeout = 120000;
-    xhr.open('POST', '/api/upload');
-    xhr.send(formData);
-  });
+  return base64;
 }
