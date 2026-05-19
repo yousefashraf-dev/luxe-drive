@@ -2,7 +2,7 @@
 'use client';
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
-import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share2, Check, User, LogOut, Plus, Heart, Flower2 } from 'lucide-react';
+import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share2, Check, User, LogOut, Plus, Heart, Flower2, Navigation } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, updateDoc, doc, increment, query, where, setDoc, deleteDoc, serverTimestamp, orderBy, limit, startAfter } from 'firebase/firestore';
 import { useAuth } from '@/lib/AuthContext';
@@ -211,7 +211,7 @@ export default function Home() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
 
-  const [activeFilter, setActiveFilter] = useState<'all' | 'wedding' | 'rental' | 'flowers' | 'favorites'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'wedding' | 'rental' | 'flowers' | 'trip' | 'favorites'>('all');
   const [driverFilter, setDriverFilter] = useState<'all' | 'with' | 'without'>('all');
   const [favorites, setFavorites] = useState<string[]>([]);
 
@@ -286,12 +286,13 @@ export default function Home() {
 
     // Filter by category
     if (activeFilter === 'flowers' && car.category !== 'flowers' && !car.bouquetName) return false;
+    if (activeFilter === 'trip' && car.category !== 'trip') return false;
     if (activeFilter === 'wedding' && car.category !== 'car_wedding') return false;
     if (activeFilter === 'rental' && car.category !== 'car_rental') return false;
-    if (activeFilter === 'all' && (car.category === 'flowers' || car.bouquetName)) return false;
+    if (activeFilter === 'all' && (car.category === 'flowers' || car.bouquetName || car.category === 'trip')) return false;
 
     // Filter by driver (only for cars), 'both' matches either filter
-    if (activeFilter !== 'flowers' && driverFilter !== 'all') {
+    if (activeFilter !== 'flowers' && activeFilter !== 'trip' && driverFilter !== 'all') {
       if (car.driver !== 'both' && car.driver !== driverFilter) return false;
     }
 
@@ -619,17 +620,20 @@ export default function Home() {
           {/* ── Filter Bar ── */}
           <div className="flex flex-wrap gap-3 mb-10 justify-center">
             {[
-              { key: 'all', label: '🚗 عربيات', icon: null },
-              { key: 'wedding', label: '🎊 زفه', icon: null },
-              { key: 'rental', label: '🚙 إيجار', icon: null },
-              { key: 'flowers', label: '💐 ورد', icon: null },
-              { key: 'favorites', label: `❤️ مفضلة (${cars.filter(c => favorites.includes(c.id)).length})`, icon: null },
+              { key: 'trip', label: '🗺️ Trips', icon: null, gold: true },
+              { key: 'all', label: '🚗 cars', icon: null },
+              { key: 'wedding', label: '🎊 zafah', icon: null },
+              { key: 'rental', label: '🚙 Rental', icon: null },
+              { key: 'flowers', label: '💐 Flowers', icon: null },
+              { key: 'favorites', label: `❤️ Favorite (${cars.filter(c => favorites.includes(c.id)).length})`, icon: null },
             ].map(f => (
               <button key={f.key} onClick={() => setActiveFilter(f.key as any)}
                 className={`px-5 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-[2px] transition-all border ${
                   activeFilter === f.key
                     ? 'bg-[#c5a059] text-black border-[#c5a059] shadow-lg'
-                    : 'bg-white/10 text-white/60 border-white/10 hover:bg-white/20 hover:text-white'
+                    : f.gold
+                      ? 'bg-[#c5a059]/10 text-[#c5a059] border-[#c5a059]/30 hover:bg-[#c5a059]/20'
+                      : 'bg-white/10 text-white/60 border-white/10 hover:bg-white/20 hover:text-white'
                 }`}>
                 {f.label}
               </button>
@@ -657,32 +661,65 @@ export default function Home() {
           )}
 
           {(loading || (cars.length === 0 && !searchQuery)) ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
-              {[1,2,3,4,5,6].map(i => (
-                <div key={i} className="rounded-[2rem] overflow-hidden border border-white/10 bg-white/10 backdrop-blur-md animate-pulse">
-                  <div className="h-[58vw] md:h-72 bg-white/10" />
-                  <div className="px-6 py-5 bg-black/40 flex items-center justify-between">
-                    <div className="space-y-2">
-                      <div className="h-3 w-16 bg-white/20 rounded-full" />
-                      <div className="h-5 w-24 bg-white/20 rounded-full" />
+            activeFilter === 'trip' ? (
+              <div className="space-y-4 md:space-y-6">
+                {[1,2,3,4].map(i => (
+                  <div key={i} className="rounded-[2rem] overflow-hidden border border-white/10 bg-white/10 backdrop-blur-md animate-pulse flex">
+                    <div className="w-[120px] md:w-[180px] h-[140px] md:h-[180px] bg-white/10 flex-shrink-0" />
+                    <div className="flex-1 p-5 space-y-3">
+                      <div className="h-4 w-32 bg-white/20 rounded-full" />
+                      <div className="h-3 w-24 bg-white/20 rounded-full" />
+                      <div className="h-3 w-48 bg-white/20 rounded-full" />
+                      <div className="flex justify-between items-center">
+                        <div className="h-5 w-20 bg-white/20 rounded-full" />
+                        <div className="flex gap-2">
+                          <div className="h-8 w-20 bg-white/20 rounded-full" />
+                          <div className="h-8 w-16 bg-white/20 rounded-full" />
+                        </div>
+                      </div>
                     </div>
-                    <div className="h-10 w-20 bg-white/20 rounded-2xl" />
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
+                {[1,2,3,4,5,6].map(i => (
+                  <div key={i} className="rounded-[2rem] overflow-hidden border border-white/10 bg-white/10 backdrop-blur-md animate-pulse">
+                    <div className="h-[58vw] md:h-72 bg-white/10" />
+                    <div className="px-6 py-5 bg-black/40 flex items-center justify-between">
+                      <div className="space-y-2">
+                        <div className="h-3 w-16 bg-white/20 rounded-full" />
+                        <div className="h-5 w-24 bg-white/20 rounded-full" />
+                      </div>
+                      <div className="h-10 w-20 bg-white/20 rounded-2xl" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
           ) : displayCars.length > 0 ? (
             <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
-              {displayCars.map((car, index) => (
-                <CarCard key={car.id} car={car} index={index}
-                  onClick={() => handleSelectCar(car)}
-                  onShare={e => { e.stopPropagation(); shareCar(car); }}
-                  isFavorited={favorites.includes(car.id)}
-                  onToggleFavorite={(e) => { e.stopPropagation(); toggleFavorite(car.id); }}
-                />
-              ))}
-            </div>
+            {activeFilter === 'trip' ? (
+              <div className="space-y-4 md:space-y-6">
+                {displayCars.map((trip, index) => (
+                  <TripCard key={trip.id} trip={trip} index={index}
+                    isFavorited={favorites.includes(trip.id)}
+                    onToggleFavorite={(e) => { e.stopPropagation(); toggleFavorite(trip.id); }}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
+                {displayCars.map((car, index) => (
+                  <CarCard key={car.id} car={car} index={index}
+                    onClick={() => handleSelectCar(car)}
+                    onShare={e => { e.stopPropagation(); shareCar(car); }}
+                    isFavorited={favorites.includes(car.id)}
+                    onToggleFavorite={(e) => { e.stopPropagation(); toggleFavorite(car.id); }}
+                  />
+                ))}
+              </div>
+            )}
             {(hasMore || loadingMore) && (
               <div ref={observerRef} className="flex justify-center py-12">
                 {loadingMore ? (
@@ -771,7 +808,9 @@ export default function Home() {
                 >
                   {selectedCar.name}
                 </h2>
-                <p className="text-[9px] text-zinc-400 uppercase tracking-[4px] mt-2 font-bold">Premium Class</p>
+                <p className="text-[9px] text-zinc-400 uppercase tracking-[4px] mt-2 font-bold">
+                  {selectedCar.category === 'trip' ? 'Trip Service' : 'Premium Class'}
+                </p>
 
                 {/* ── Share button — تحت الاسم مباشرة ── */}
                 <button
@@ -796,8 +835,29 @@ export default function Home() {
                 </p>
               )}
 
+              {/* ── Trip route info ── */}
+              {selectedCar.category === 'trip' && (selectedCar.fromLocation || selectedCar.toLocation) && (
+                <div className="mt-5 bg-white rounded-[1.2rem] border border-zinc-200 shadow-sm p-5" dir="rtl">
+                  <div className="flex items-center gap-4 justify-center">
+                    {selectedCar.fromLocation && (
+                      <div className="text-center">
+                        <p className="text-[8px] text-zinc-400 uppercase tracking-widest font-bold">من</p>
+                        <p className="text-lg font-bold text-black mt-1">{selectedCar.fromLocation}</p>
+                      </div>
+                    )}
+                    <div className="text-zinc-300 text-2xl">→</div>
+                    {selectedCar.toLocation && (
+                      <div className="text-center">
+                        <p className="text-[8px] text-zinc-400 uppercase tracking-widest font-bold">إلى</p>
+                        <p className="text-lg font-bold text-black mt-1">{selectedCar.toLocation}</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* ── Smart Calendar ── */}
-              {(() => {
+              {selectedCar.category !== 'trip' && (() => {
                 const now        = new Date();
                 const year       = now.getFullYear();
                 const month      = now.getMonth(); // 0-indexed
@@ -1006,5 +1066,99 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
         </div>
       </div>
     </div>
+  );
+}
+
+/* ════════════════════════════════════
+   TRIP CARD — Horizontal List Layout
+════════════════════════════════════ */
+function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
+  trip: any; index?: number;
+  isFavorited?: boolean; onToggleFavorite?: (e: React.MouseEvent) => void;
+}) {
+  const [zoomedImage, setZoomedImage] = useState<string | null>(null);
+  const imageUrl = optimizeImage(
+    Array.isArray(trip.image) ? trip.image[0] : trip.image || '/placeholder-car.png',
+    400
+  );
+  const myWhatsAppNumber = "201095976766";
+
+  return (
+    <>
+      <div className="group relative bg-[#0a0a0a] backdrop-blur-xl border border-white/15 rounded-[1.8rem] md:rounded-[2rem] overflow-hidden shadow-2xl hover:shadow-[0_20px_60px_rgba(0,0,0,0.7)] hover:-translate-y-0.5 transition-all duration-500">
+        <div className="flex flex-row">
+          <div
+            className="relative w-[130px] md:w-[200px] flex-shrink-0 overflow-hidden cursor-pointer rounded-r-[1.8rem] md:rounded-r-[2rem]"
+            onClick={() => setZoomedImage(Array.isArray(trip.image) ? trip.image[0] : trip.image || '/placeholder-car.png')}
+          >
+            <div className="h-full min-h-[150px] md:min-h-[200px] relative">
+              <Image
+                src={imageUrl}
+                alt={trip.name}
+                fill
+                className="object-cover transition-transform duration-700 group-hover:scale-110"
+                sizes="200px"
+              />
+            </div>
+            <button onClick={onToggleFavorite}
+              className={`absolute top-3 left-3 w-8 h-8 rounded-full backdrop-blur-md border flex items-center justify-center transition-all duration-300 shadow-md z-10 ${
+                isFavorited ? 'bg-red-500/20 border-red-400/50' : 'bg-white/20 border-white/30 hover:bg-white'
+              }`}>
+              <Heart size={13} className={`transition-colors ${isFavorited ? 'text-red-400 fill-red-400' : 'text-white'}`} />
+            </button>
+          </div>
+
+          <div className="flex-1 p-4 md:p-6 flex flex-col justify-center text-right" dir="rtl">
+            <div>
+              <h3 className="font-serif text-lg md:text-2xl italic text-white font-semibold leading-tight">
+                {trip.name}
+              </h3>
+              {(trip.fromLocation || trip.toLocation) && (
+                <p className="text-indigo-300/80 text-[10px] md:text-[12px] mt-1">
+                  🗺️ {trip.fromLocation || '...'} → {trip.toLocation || '...'}
+                </p>
+              )}
+              {trip.description && (
+                <p className="text-white/70 text-[11px] md:text-[13px] mt-2 leading-relaxed line-clamp-2">
+                  {trip.description}
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center justify-between mt-4 md:mt-5">
+              <div className="flex gap-2">
+                <a href={`https://wa.me/${trip.whatsapp || trip.phone || myWhatsAppNumber}?text=${encodeURIComponent("مرحباً، أنا مهتم بـ " + trip.name)}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 bg-[#25D366] text-white px-3 md:px-5 py-2 md:py-2.5 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider hover:bg-[#20bd5a] transition-all active:scale-95 shadow-md">
+                  <MessageCircle size={12} /> WhatsApp
+                </a>
+                <a href={`tel:+${trip.phone || trip.whatsapp || myWhatsAppNumber}`}
+                  className="flex items-center gap-1.5 bg-white/10 text-white px-3 md:px-5 py-2 md:py-2.5 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider hover:bg-white/20 transition-all active:scale-95 shadow-md border border-white/10">
+                  <Phone size={12} /> Call
+                </a>
+              </div>
+              <p className="text-lg md:text-2xl font-extrabold text-white">
+                {trip.price} <span className="text-[9px] md:text-[11px] text-zinc-400 font-bold">EGP</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {zoomedImage && (
+        <div className="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out"
+          onClick={() => setZoomedImage(null)}>
+          <button className="absolute top-6 right-6 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all group z-10"
+            onClick={() => setZoomedImage(null)}>
+            <X size={22} className="transition-transform duration-500 group-hover:rotate-90" />
+          </button>
+          <Image src={zoomedImage} alt="Zoomed" fill
+            className="object-contain rounded-2xl shadow-2xl select-none"
+            style={{ animation: 'zoomIn 0.25s ease-out' }}
+            onClick={e => e.stopPropagation()} />
+          <p className="absolute bottom-6 text-white/40 text-[10px] tracking-[4px] uppercase">اضغط خارج الصورة للإغلاق</p>
+        </div>
+      )}
+    </>
   );
 }

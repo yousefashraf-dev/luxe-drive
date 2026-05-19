@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
-import { ArrowLeft, Car, Eye, Calendar, DollarSign, Phone, FileText, Image as ImageIcon, Edit3, X, ChevronRight, ChevronLeft, Star, Save, Flower2, Heart } from 'lucide-react';
+import { ArrowLeft, Car, Eye, Calendar, DollarSign, Phone, FileText, Image as ImageIcon, Edit3, X, ChevronRight, ChevronLeft, Star, Save, Flower2, Heart, Navigation } from 'lucide-react';
 import { formatPhone } from '@/lib/utils';
 import { uploadWithProgress } from '@/lib/useUpload';
 
@@ -65,6 +65,8 @@ function EditModal({ ad, onClose, onSaved }) {
   const [images, setImages] = useState<string[]>(Array.isArray(ad.image) ? ad.image : ad.image ? [ad.image] : []);
   const [bookedDays, setBookedDays] = useState<number[]>(ad.bookedDays || []);
   const [driver, setDriver] = useState(ad.driver || 'without');
+  const [fromLocation, setFromLocation] = useState(ad.fromLocation || '');
+  const [toLocation, setToLocation] = useState(ad.toLocation || '');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{current: number; total: number; percent: number} | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -76,19 +78,31 @@ function EditModal({ ad, onClose, onSaved }) {
   const handleSave = async () => {
     setSubmitting(true);
     try {
-      await updateDoc(doc(db, "cars", ad.id), {
-        name, price, description, driver,
+      const updateData: any = {
+        name, price, description,
         phone: formatPhone(phone),
         whatsapp: whatsapp ? formatPhone(whatsapp) : '',
-        location, image: images, bookedDays,
+        location, image: images,
         updatedAt: serverTimestamp()
-      });
+      };
+      if (ad.category === 'trip') {
+        updateData.fromLocation = fromLocation;
+        updateData.toLocation = toLocation;
+        updateData.driver = null;
+        updateData.bookedDays = [];
+      } else {
+        updateData.driver = driver;
+        updateData.bookedDays = bookedDays;
+      }
+      await updateDoc(doc(db, "cars", ad.id), updateData);
       alert('تم الحفظ! ✅');
       onSaved();
       onClose();
     } catch (e) { alert('فشل الحفظ'); }
     finally { setSubmitting(false); }
   };
+
+  const isTrip = ad.category === 'trip';
 
   return (
     <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -104,6 +118,23 @@ function EditModal({ ad, onClose, onSaved }) {
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">اسم البوكيه</label>
               <input value={name} onChange={e => setName(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
             </div>
+          ) : isTrip ? (
+            <>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">اسم المشوار</label>
+                <input value={name} onChange={e => setName(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">من</label>
+                  <input value={fromLocation} onChange={e => setFromLocation(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">إلى</label>
+                  <input value={toLocation} onChange={e => setToLocation(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
+                </div>
+              </div>
+            </>
           ) : (
             <>
               <div>
@@ -159,7 +190,7 @@ function EditModal({ ad, onClose, onSaved }) {
             <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black h-24 resize-none" />
           </div>
 
-          {!ad.bouquetName && (
+          {!ad.bouquetName && !isTrip && (
             <div>
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">الأيام المحجوزة</label>
               <CalendarPicker bookedDays={bookedDays} onToggle={handleToggleDay} />
@@ -326,6 +357,7 @@ export default function MyAdsPage() {
                           {ad.status === 'active' ? 'منشور' : 'معلق'}
                         </span>
                         {isFlower && <Flower2 size={16} className="text-pink-400" />}
+                {ad.category === 'trip' && <Navigation size={16} className="text-blue-400" />}
                       </div>
                       <div className="flex flex-wrap gap-4 items-center text-[11px] text-zinc-500">
                         <span className="font-bold">{ad.price} EGP</span>
@@ -333,9 +365,11 @@ export default function MyAdsPage() {
                           <Eye size={13} className="text-blue-500" />
                           <span>{ad.views || 0} مشاهدة</span>
                         </div>
-                        {ad.location && (
+                        {ad.category === 'trip' && ad.fromLocation && ad.toLocation ? (
+                          <span>🗺️ {ad.fromLocation} → {ad.toLocation}</span>
+                        ) : ad.location ? (
                           <span>📍 {ad.location}</span>
-                        )}
+                        ) : null}
                         {dLeft !== null && dLeft !== undefined && (
                           <span className={dLeft <= 2 ? 'text-red-500 font-bold' : ''}>
                             ⏰ متبقي {dLeft} يوم

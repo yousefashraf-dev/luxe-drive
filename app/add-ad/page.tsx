@@ -6,7 +6,7 @@ import { useAuth } from '@/lib/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
-import { ArrowLeft, Car, Flower2, DollarSign, Phone, MapPin, FileText, Image as ImageIcon, ChevronRight, ChevronLeft, X, User, Calendar } from 'lucide-react';
+import { ArrowLeft, Car, Flower2, DollarSign, Phone, MapPin, FileText, Image as ImageIcon, ChevronRight, ChevronLeft, X, User, Calendar, Navigation } from 'lucide-react';
 import { formatPhone } from '@/lib/utils';
 import { uploadWithProgress } from '@/lib/useUpload';
 
@@ -72,8 +72,8 @@ export default function AddAdPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{current: number; total: number; percent: number} | null>(null);
 
-  // Step 0: Car or Flowers
-  const [type, setType] = useState<'car' | 'flowers' | null>(null);
+  // Step 0: Car, Flowers, or Trip
+  const [type, setType] = useState<'car' | 'flowers' | 'trip' | null>(null);
   // Step 1 (car): wedding or rental
   const [carType, setCarType] = useState<'wedding' | 'rental' | null>(null);
   // Step 2 (car): with or without driver
@@ -91,6 +91,10 @@ export default function AddAdPage() {
 
   // Flower-specific
   const [bouquetName, setBouquetName] = useState('');
+
+  // Trip-specific
+  const [fromLocation, setFromLocation] = useState('');
+  const [toLocation, setToLocation] = useState('');
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/');
@@ -111,6 +115,11 @@ export default function AddAdPage() {
           if (data.category === 'flowers') {
             setType('flowers');
             setBouquetName(data.bouquetName || '');
+          } else if (data.category === 'trip') {
+            setType('trip');
+            setName(data.name || '');
+            setFromLocation(data.fromLocation || '');
+            setToLocation(data.toLocation || '');
           } else {
             setType('car');
             setCarType(data.category === 'car_wedding' ? 'wedding' : 'rental');
@@ -153,9 +162,11 @@ export default function AddAdPage() {
         whatsapp: whatsapp ? formatPhone(whatsapp) : '',
         location,
         bookedDays,
-        category: type === 'flowers' ? 'flowers' : carType === 'wedding' ? 'car_wedding' : 'car_rental',
-        driver: type === 'flowers' ? null : driver,
+        category: type === 'flowers' ? 'flowers' : type === 'trip' ? 'trip' : carType === 'wedding' ? 'car_wedding' : 'car_rental',
+        driver: type === 'flowers' || type === 'trip' ? null : driver,
         bouquetName: type === 'flowers' ? bouquetName : '',
+        fromLocation: type === 'trip' ? fromLocation : '',
+        toLocation: type === 'trip' ? toLocation : '',
         userId: user?.uid || '',
         userEmail: user?.email || '',
         status: 'suspended',
@@ -192,7 +203,7 @@ export default function AddAdPage() {
 
   const progress = type === 'car'
     ? (carType ? (driver ? 60 : 40) : 20)
-    : (type === 'flowers' ? 40 : 0);
+    : (type === 'flowers' ? 40 : type === 'trip' ? 40 : 0);
 
   return (
     <main className="min-h-screen bg-black text-white">
@@ -219,22 +230,30 @@ export default function AddAdPage() {
                 <p className="text-[9px] tracking-[5px] uppercase text-zinc-500 font-bold">Step 1</p>
                 <h2 className="font-serif text-3xl italic mt-2">إيه اللي عاوز تنشره؟</h2>
               </div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-3 gap-4 md:gap-6">
                 <button type="button" onClick={() => { setType('car'); setStep(1); }}
-                  className={`p-10 rounded-[2.5rem] border-2 transition-all duration-300 text-center group ${
+                  className={`p-8 md:p-10 rounded-[2.5rem] border-2 transition-all duration-300 text-center group ${
                     type === 'car' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
-                  <Car size={48} className={`mx-auto mb-4 ${type === 'car' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
-                  <p className="text-lg font-bold">🚗 عربية</p>
-                  <p className="text-[10px] text-zinc-500 mt-2">زفه أو إيجار</p>
+                  <Car size={40} className={`mx-auto mb-3 ${type === 'car' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
+                  <p className="text-base md:text-lg font-bold">🚗 Car</p>
+                  <p className="text-[9px] text-zinc-500 mt-2">Wedding / Rental</p>
                 </button>
                 <button type="button" onClick={() => { setType('flowers'); setStep(3); }}
-                  className={`p-10 rounded-[2.5rem] border-2 transition-all duration-300 text-center group ${
+                  className={`p-8 md:p-10 rounded-[2.5rem] border-2 transition-all duration-300 text-center group ${
                     type === 'flowers' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
-                  <Flower2 size={48} className={`mx-auto mb-4 ${type === 'flowers' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
-                  <p className="text-lg font-bold">💐 بوكيه ورد</p>
-                  <p className="text-[10px] text-zinc-500 mt-2">بوكيهات العروسة</p>
+                  <Flower2 size={40} className={`mx-auto mb-3 ${type === 'flowers' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
+                  <p className="text-base md:text-lg font-bold">💐 Flowers</p>
+                  <p className="text-[9px] text-zinc-500 mt-2">Bouquets</p>
+                </button>
+                <button type="button" onClick={() => { setType('trip'); setStep(3); }}
+                  className={`p-8 md:p-10 rounded-[2.5rem] border-2 transition-all duration-300 text-center group ${
+                    type === 'trip' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
+                  }`}>
+                  <Navigation size={40} className={`mx-auto mb-3 ${type === 'trip' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
+                  <p className="text-base md:text-lg font-bold">🗺️ Trips</p>
+                  <p className="text-[9px] text-zinc-500 mt-2">Point-to-point</p>
                 </button>
               </div>
             </div>
@@ -253,7 +272,7 @@ export default function AddAdPage() {
                     carType === 'wedding' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
                   <p className="text-4xl mb-3">🎊</p>
-                  <p className="text-lg font-bold">زفه</p>
+                  <p className="text-lg font-bold">zafah</p>
                   <p className="text-[10px] text-zinc-500 mt-2">سيارات الزفاف</p>
                 </button>
                 <button type="button" onClick={() => { setCarType('rental'); setStep(2); }}
@@ -261,7 +280,7 @@ export default function AddAdPage() {
                     carType === 'rental' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
                   <p className="text-4xl mb-3">🚙</p>
-                  <p className="text-lg font-bold">إيجار</p>
+                  <p className="text-lg font-bold">Car Rental</p>
                   <p className="text-[10px] text-zinc-500 mt-2">تأجير يومي</p>
                 </button>
               </div>
@@ -309,7 +328,7 @@ export default function AddAdPage() {
             <div className="space-y-8">
               <div className="text-center">
                 <p className="text-[9px] tracking-[5px] uppercase text-zinc-500 font-bold">
-                  Step {type === 'flowers' ? 2 : 4}
+                  Step {type === 'flowers' || type === 'trip' ? 2 : 4}
                 </p>
                 <h2 className="font-serif text-3xl italic mt-2">تفاصيل الإعلان</h2>
               </div>
@@ -321,6 +340,29 @@ export default function AddAdPage() {
                     <input required value={bouquetName} onChange={e => setBouquetName(e.target.value)}
                       className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600"
                       placeholder="مثلاً: بوكيه الورود الحمراء" />
+                  </div>
+                </div>
+              ) : type === 'trip' ? (
+                <div className="space-y-5">
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">اسم المشوار</label>
+                    <input required value={name} onChange={e => setName(e.target.value)}
+                      className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600"
+                      placeholder="مثلاً: مشوار مطار القاهرة" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">من</label>
+                      <input required value={fromLocation} onChange={e => setFromLocation(e.target.value)}
+                        className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600"
+                        placeholder="شبين الكوم" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">إلى</label>
+                      <input required value={toLocation} onChange={e => setToLocation(e.target.value)}
+                        className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600"
+                        placeholder="مطار القاهرة" />
+                    </div>
                   </div>
                 </div>
               ) : (
@@ -383,7 +425,7 @@ export default function AddAdPage() {
                   placeholder="اكتب تفاصيل عن إعلانك..." />
               </div>
 
-              {type !== 'flowers' && (
+              {type === 'car' && (
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">الأيام المحجوزة</label>
                   <CalendarPicker bookedDays={bookedDays} onToggle={handleToggleDay} />

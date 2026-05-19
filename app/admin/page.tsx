@@ -6,7 +6,7 @@ import { db } from '@/lib/firebase';
 import { useAuth } from '@/lib/AuthContext';
 import { useRouter } from 'next/navigation';
 import { collection, deleteDoc, doc, updateDoc, onSnapshot, query, orderBy, serverTimestamp } from 'firebase/firestore';
-import { LayoutDashboard, LogOut, Trash2, Edit3, Eye, Calendar, TrendingUp, Car, Star, Phone, CheckCircle, XCircle, Flower2 } from 'lucide-react';
+import { LayoutDashboard, LogOut, Trash2, Edit3, Eye, Calendar, TrendingUp, Car, Star, Phone, CheckCircle, XCircle, Flower2, Navigation } from 'lucide-react';
 import Link from 'next/link';
 
 export default function AdminDashboard() {
@@ -67,8 +67,9 @@ export default function AdminDashboard() {
     return Math.ceil((exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
   };
 
-  const carAds = cars.filter(c => c.category !== 'flowers' && !c.bouquetName);
+  const carAds = cars.filter(c => c.category !== 'flowers' && !c.bouquetName && c.category !== 'trip');
   const flowerAds = cars.filter(c => c.category === 'flowers' || c.bouquetName);
+  const tripAds = cars.filter(c => c.category === 'trip');
 
   const AdCard = (car) => {
     const dLeft = daysLeft(car);
@@ -238,6 +239,32 @@ export default function AdminDashboard() {
               <div className="text-center py-16 border-2 border-dashed border-zinc-100 rounded-[3rem]">
                 <Flower2 size={48} className="mx-auto text-zinc-100 mb-4" />
                 <p className="text-zinc-300 uppercase tracking-widest text-[10px]">No flower ads yet</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Trips Section */}
+        <div>
+          <div className="flex items-center justify-between mb-8">
+            <h2 className="text-2xl font-serif italic flex items-center gap-3">
+              <Navigation size={24} className="text-zinc-400" />
+              Trips
+            </h2>
+            <div className="flex gap-2">
+              <span className="text-[9px] bg-blue-50 text-blue-600 px-4 py-2 rounded-full font-bold uppercase tracking-widest border border-blue-100">
+                {tripAds.filter(c => c.status === 'active').length} منشور
+              </span>
+              <span className="text-[9px] bg-red-50 text-red-400 px-4 py-2 rounded-full font-bold uppercase tracking-widest border border-red-100">
+                {tripAds.filter(c => c.status !== 'active').length} معلق
+              </span>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 gap-6">
+            {tripAds.length > 0 ? tripAds.map(AdCard) : (
+              <div className="text-center py-16 border-2 border-dashed border-zinc-100 rounded-[3rem]">
+                <Navigation size={48} className="mx-auto text-zinc-100 mb-4" />
+                <p className="text-zinc-300 uppercase tracking-widest text-[10px]">No trip ads yet</p>
               </div>
             )}
           </div>
