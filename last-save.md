@@ -487,3 +487,93 @@ git push origin main
 | `app/api/upload/route.ts` | حذف |
 | `firebase-rules.md` | **جديد** — قواعد Firestore + Storage |
 | `last-save.md` | توثيق التعديلات |
+
+---
+
+# تحديث 19 مايو 2026 — v7.0: قسم Trips (المشاوير)
+
+## أوردر الرفع
+
+```bash
+git add .
+git commit -m "v7.0: new Trips category — add, filter, list display, admin"
+git push origin main
+```
+
+## التعديلات
+
+### 1️⃣ نوع إعلان جديد: Trips
+
+**البيانات**: `category: 'trip'` في كوليكشن `cars` — مستقل عن العربيات والورد. بيظهر بس في فلتر Trips.
+
+| الحقل | الوصف |
+|-------|-------|
+| `name` | اسم المشوار (مثلاً: مشوار مطار القاهرة) |
+| `fromLocation` | نقطة الانطلاق |
+| `toLocation` | نقطة الوصول |
+| `price` | السعر |
+| `description` | وصف الرحلة |
+| `image` | صور (array) |
+| `phone` / `whatsapp` | أرقام الاتصال |
+| `category` | `'trip'` |
+| `status` | `'suspended'` — في انتظار موافقة الأدمن |
+
+**لا يحتوي** على: `bookedDays`, `driver`, `bouquetName`.
+
+### 2️⃣ رفع الإعلان — `app/add-ad/page.tsx`
+
+- **Step 0**: 3 أزرار بدل 2 — 🚗 Car • 💐 Flowers • 🗺️ Trips
+- اختيار Trips → يودي على تفاصيل مباشر (زي الورد)
+- حقول Trips: **اسم المشوار** + **من** + **إلى** (بدل اسم العربية + الموقع)
+- مفيش تقويم أيام محجوزة
+- مفيش خيار سواق
+
+### 3️⃣ الفلتر في الصفحة الرئيسية — `app/page.tsx`
+
+- زرار **🗺️ Trips** أول الفلاتر بلون دهبي مميز:
+  - غير نشط: `bg-[#c5a059]/10 border-[#c5a059]/30 text-[#c5a059]` (يلفت النظر)
+  - نشط: `bg-[#c5a059] text-black` (زي الباقي)
+- الفلتر `'all'` يستبعد `category === 'trip'`
+- فلتر `'trip'` يعرض فقط `category === 'trip'`
+- مفيش driver filter للمشاوير
+
+### 4️⃣ عرض Trips — Horizontal List (TripCard)
+
+**استايل مختلف** عن العربيات — كارد أفقي بالعرض:
+
+```
+┌──────────────────────────────────────────────┐
+│  ┌──────────┐  مشوار مطار القاهرة            │
+│  │  Image   │  🗺️ شبين الكوم → مطار القاهرة │
+│  │  (hover  │  توصيل مكيف ومريح...           │
+│  │  =>scale)│  500 EGP                       │
+│  │  ♥       │  [💬 WhatsApp] [📞 اتصل]      │
+│  └──────────┘  خلفية: أسود ثابت              │
+└──────────────────────────────────────────────┘
+```
+
+- **مفيش مودال** — كل التفاصيل ظاهرة في الكارد
+- الصورة تتكبر بالضغط عليها (lightbox)
+- خلفية `bg-[#0a0a0a]` — وضوح تام للنصوص
+- ألوان النص: أبيض صريح للاسم والسعر، `text-white/70` للوصف
+
+### 5️⃣ لوحة الأدمن — `app/admin/page.tsx`
+
+- إضافة قسم **Trips** جنب العربيات والورد
+- نفس نظام الـ AdCard (نشر/تعليق/تعديل/حذف)
+
+### 6️⃣ إعلاناتي — `app/my-ads/page.tsx`
+
+- عرض المشاوير مع أيقونة 🗺️
+- عرض المسار `من → إلى` بدل الموقع
+- EditModal: حقول من/إلى + مفيش تقويم + مفيش سواق
+
+## الملفات المعدلة
+
+| الملف | التغيير |
+|-------|---------|
+| `app/add-ad/page.tsx` | إضافة Trips option + from→to fields + navigation icon |
+| `app/page.tsx` | TripCard component + filter 'trip' + display logic + trips strip |
+| `app/admin/page.tsx` | إضافة قسم Trips مع counter + Navigation icon |
+| `app/my-ads/page.tsx` | عرض مسار المشاوير + EditModal يدعم trips |
+| `last-save.md` | توثيق التعديلات |

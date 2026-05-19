@@ -2,7 +2,7 @@
 'use client';
 import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
-import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share2, Check, User, LogOut, Plus, Heart, Flower2, Navigation } from 'lucide-react';
+import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share2, Check, User, LogOut, Plus, Heart, Flower2 } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, updateDoc, doc, increment, query, where, setDoc, deleteDoc, serverTimestamp, orderBy, limit, startAfter } from 'firebase/firestore';
 import { useAuth } from '@/lib/AuthContext';
@@ -1088,10 +1088,10 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
       <div className="group relative bg-[#0a0a0a] backdrop-blur-xl border border-white/15 rounded-[1.8rem] md:rounded-[2rem] overflow-hidden shadow-2xl hover:shadow-[0_20px_60px_rgba(0,0,0,0.7)] hover:-translate-y-0.5 transition-all duration-500">
         <div className="flex flex-row">
           <div
-            className="relative w-[130px] md:w-[200px] flex-shrink-0 overflow-hidden cursor-pointer rounded-r-[1.8rem] md:rounded-r-[2rem]"
+            className="relative w-[95px] md:w-[200px] flex-shrink-0 overflow-hidden cursor-pointer rounded-r-[1.8rem] md:rounded-r-[2rem]"
             onClick={() => setZoomedImage(Array.isArray(trip.image) ? trip.image[0] : trip.image || '/placeholder-car.png')}
           >
-            <div className="h-full min-h-[150px] md:min-h-[200px] relative">
+            <div className="h-full min-h-[120px] md:min-h-[200px] relative">
               <Image
                 src={imageUrl}
                 alt={trip.name}
@@ -1101,45 +1101,45 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
               />
             </div>
             <button onClick={onToggleFavorite}
-              className={`absolute top-3 left-3 w-8 h-8 rounded-full backdrop-blur-md border flex items-center justify-center transition-all duration-300 shadow-md z-10 ${
+              className={`absolute top-2 left-2 w-7 h-7 md:w-8 md:h-8 rounded-full backdrop-blur-md border flex items-center justify-center transition-all duration-300 shadow-md z-10 ${
                 isFavorited ? 'bg-red-500/20 border-red-400/50' : 'bg-white/20 border-white/30 hover:bg-white'
               }`}>
-              <Heart size={13} className={`transition-colors ${isFavorited ? 'text-red-400 fill-red-400' : 'text-white'}`} />
+              <Heart size={11} className={`transition-colors ${isFavorited ? 'text-red-400 fill-red-400' : 'text-white'}`} />
             </button>
           </div>
 
-          <div className="flex-1 p-4 md:p-6 flex flex-col justify-center text-right" dir="rtl">
+          <div className="flex-1 p-2.5 md:p-6 flex flex-col justify-center text-right" dir="rtl">
             <div>
-              <h3 className="font-serif text-lg md:text-2xl italic text-white font-semibold leading-tight">
+              <h3 className="font-serif text-sm md:text-2xl italic text-white font-semibold leading-tight">
                 {trip.name}
               </h3>
               {(trip.fromLocation || trip.toLocation) && (
-                <p className="text-indigo-300/80 text-[10px] md:text-[12px] mt-1">
+                <p className="text-indigo-300/80 text-[9px] md:text-[12px] mt-0.5 md:mt-1">
                   🗺️ {trip.fromLocation || '...'} → {trip.toLocation || '...'}
                 </p>
               )}
               {trip.description && (
-                <p className="text-white/70 text-[11px] md:text-[13px] mt-2 leading-relaxed line-clamp-2">
+                <p className="text-white/70 text-[10px] md:text-[13px] mt-1 leading-relaxed line-clamp-2">
                   {trip.description}
                 </p>
               )}
             </div>
 
-            <div className="flex items-center justify-between mt-4 md:mt-5">
-              <div className="flex gap-2">
+            <div className="flex md:items-center justify-between mt-2 md:mt-5 gap-1.5 md:gap-0 flex-col md:flex-row">
+              <p className="text-sm md:text-2xl font-extrabold text-white order-2 md:order-1">
+                {trip.price} <span className="text-[8px] md:text-[11px] text-zinc-400 font-bold">EGP</span>
+              </p>
+              <div className="flex gap-1.5 order-1 md:order-2">
                 <a href={`https://wa.me/${trip.whatsapp || trip.phone || myWhatsAppNumber}?text=${encodeURIComponent("مرحباً، أنا مهتم بـ " + trip.name)}`}
                   target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 bg-[#25D366] text-white px-3 md:px-5 py-2 md:py-2.5 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider hover:bg-[#20bd5a] transition-all active:scale-95 shadow-md">
-                  <MessageCircle size={12} /> WhatsApp
+                  className="flex items-center gap-1 bg-[#25D366] text-white px-2 md:px-5 py-1.5 md:py-2.5 rounded-full text-[7px] md:text-[10px] font-bold uppercase tracking-wider hover:bg-[#20bd5a] transition-all active:scale-95 shadow-md">
+                  <MessageCircle size={10} /> WhatsApp
                 </a>
                 <a href={`tel:+${trip.phone || trip.whatsapp || myWhatsAppNumber}`}
-                  className="flex items-center gap-1.5 bg-white/10 text-white px-3 md:px-5 py-2 md:py-2.5 rounded-full text-[8px] md:text-[10px] font-bold uppercase tracking-wider hover:bg-white/20 transition-all active:scale-95 shadow-md border border-white/10">
-                  <Phone size={12} /> Call
+                  className="flex items-center gap-1 bg-white/10 text-white px-2 md:px-5 py-1.5 md:py-2.5 rounded-full text-[7px] md:text-[10px] font-bold uppercase tracking-wider hover:bg-white/20 transition-all active:scale-95 shadow-md border border-white/10">
+                  <Phone size={10} /> Call
                 </a>
               </div>
-              <p className="text-lg md:text-2xl font-extrabold text-white">
-                {trip.price} <span className="text-[9px] md:text-[11px] text-zinc-400 font-bold">EGP</span>
-              </p>
             </div>
           </div>
         </div>
@@ -1148,9 +1148,9 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
       {zoomedImage && (
         <div className="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out"
           onClick={() => setZoomedImage(null)}>
-          <button className="absolute top-6 right-6 w-12 h-12 bg-white/10 rounded-full flex items-center justify-center text-white hover:bg-white/20 transition-all group z-10"
+          <button className="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/70 border border-white/30 flex items-center justify-center text-white shadow-lg hover:bg-white/20 transition-all z-20"
             onClick={() => setZoomedImage(null)}>
-            <X size={22} className="transition-transform duration-500 group-hover:rotate-90" />
+            <X size={18} />
           </button>
           <Image src={zoomedImage} alt="Zoomed" fill
             className="object-contain rounded-2xl shadow-2xl select-none"
