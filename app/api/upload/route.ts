@@ -14,10 +14,7 @@ export async function POST(req: NextRequest) {
     const body = new FormData();
     body.append('file', blob, file.name);
     body.append('upload_preset', 'ml_default');
-    body.append('width', '1200');
-    body.append('crop', 'limit');
-    body.append('quality', 'auto');
-    body.append('format', 'webp');
+    body.append('transformation', 'w_1200,c_limit,q_auto,f_webp');
 
     const res = await fetch(
       `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
