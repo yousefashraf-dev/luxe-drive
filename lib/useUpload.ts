@@ -7,7 +7,7 @@ export interface UploadProgress {
   percent: number;
 }
 
-const CLOUD_NAME = 'dllaxor9r';
+const CLOUD_NAME = 'dliaxor9r';
 const UPLOAD_PRESET = 'zafah_unsigned';
 
 export async function uploadWithProgress(
