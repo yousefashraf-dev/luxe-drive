@@ -393,3 +393,97 @@ git push origin main
 
 ## ملحوظة
 - الرفع بيحتاج Upload Preset `ml_default` في Cloudinary يكون **Unsigned** — تأكد من Cloudinary Dashboard > Settings > Upload > Upload presets > ml_default > Signing Mode = Unsigned
+
+---
+
+# تحديث 19 مايو 2026 — v6.0: حل مشكلة رفع الصور (Base64 في Firestore + Canvas Compression)
+
+## ملخص المشكلة
+رفع الصور من الموبايل (iPhone/Android) كان بيفشل بسبب:
+1. **Cloudinary unsigned upload** → "Unknown API key" (حتى مع Unsigned preset)
+2. **Signed upload (cloudinary SDK)** → "Must supply api_secret" (env var مش موجود وقت build)
+3. **Unsigned upload مع transformation** → "Unknown API key"
+4. **Unsigned upload بسيط** → 502 timeout من Vercel (Hobby plan 10s)
+5. **Firebase Storage** → مش مفعل في الحساب (محتاج فلوس)
+
+## الحل النهائي — Canvas Compression + Base64 في Firestore
+
+بدل ما نرفع الصور لسيرفر خارجي، بنضغطها على جهاز المستخدم باستخدام Canvas وبعدين نخزنها كـ Base64 string جوه Firestore.
+
+### الـ flow
+
+```
+صورة خام (4MB JPEG)
+  ↓
+Canvas: resize 1200px + JPEG 85%
+  ↓  (على جهاز المستخدم — فوري)
+Blob ~150KB
+  ↓
+FileReader → Base64 string (data:image/...)
+  ↓  (أو toDataURL fallback لو toBlob فشل)
+Base64 ~200KB
+  ↓
+حفظ direct في Firestore cars.image[]
+  ↑  (لا timeout, لا API خارجي, لا env vars)
+  ↓
+عرض: <img src={base64 string} /> — مفيش CDN
+```
+
+### التغييرات
+
+| الملف | التغيير |
+|-------|---------|
+| `lib/useUpload.ts` | **إعادة كتابة كاملة** — الرفع بقى Canvas → Base64 مباشر. `toBlob` أساسي، `toDataURL` fallback لـ iOS. Timeout 30s لتحميل الصورة. Progress خلال مراحل الضغط |
+| `lib/firebase.js` | رجوع للوضع الأصلي — تم إزالة `getStorage` (مش محتاجين Firebase Storage) |
+| `app/add-ad/page.tsx` | بسيط: إزالة `userId` parameter من استدعاء `uploadWithProgress` |
+| `app/my-ads/page.tsx` | بسيط: إزالة `userId` prop من EditModal |
+| `app/api/upload/route.ts` | **حذف الملف بالكامل** — مش محتاجين API route للسيرفر |
+| `app/api/` | **حذف المجلد بالكامل** |
+| `firebase-rules.md` | **جديد** — ملف فيه كل قواعد Firestore + Storage للنسخ واللصق |
+
+### تفاصيل تقنية — `lib/useUpload.ts`
+
+| الدالة | الوظيفة |
+|--------|---------|
+| `loadImage(file)` | تحميل الصورة في `Image` element مع timeout 30s |
+| `drawOnCanvas(img)` | رسم الصورة على Canvas بمقاس max 1200px مع الحفاظ على الـ aspect ratio |
+| `canvasToBase64(canvas)` | تحويل الـ Canvas لـ Base64: `toBlob` أولاً ← لو رجع `null` (iOS) → `toDataURL` fallback |
+| `uploadWithProgress(file, onProgress)` | الدالة الرئيسية — بتستدعي الثلاثة دوال فوق مع تحديث progress (10% → 30% → 50% → 100%) |
+
+### المشاكل اللي اتصلحت
+
+| المشكلة | الحل |
+|---------|------|
+| **Canvas.toBlob() بيرجع null على iOS Safari** | إضافة fallback: `canvas.toDataURL('image/jpeg', QUALITY)` |
+| **تحميل الصورة معلق على الموبايل (netwaok بطيء)** | Timeout 30s مع رسالة "انتهت مهلة تحميل الصورة" |
+| **Vercel timeout 10s** | تم الحذف — مفيش server-side code خالص |
+| **Cloudinary "Unknown API key"** | تم الاستغناء عن Cloudinary تماماً |
+| **Firebase Storage مش مفعل** | مش محتاجينه — بنحفظ Base64 مباشر في Firestore |
+| **No progress indicator** | progress percentage خلال مراحل الضغط (0% → 10% → 30% → 50% → 100%) |
+
+### ملاحظات مهمة
+
+- **الحد الأقصى:** Firestore document 1MB. الصورة الواحدة ~200KB Base64. ممكن 4-5 صور بأمان.
+- **الـ optimizeImage()** في `page.tsx` مش بتأثر على Base64 URLs (بتعديهم زي ما هم).
+- **الصور القديمة في Cloudinary** لسه شغالة — `optimizeImage()` بتشتغل على URLs اللي فيها `res.cloudinary.com`.
+- **الـ upload_preset مش محتاج unsigned** — مش بنستخدم Cloudinary للرفع خالص.
+
+### أوردر الرفع النهائي
+
+```bash
+git add .
+git commit -m "fix: store compressed base64 images in Firestore + iOS canvas fallback"
+git push origin main
+```
+
+### الملفات المعدلة في هذا التحديث
+
+| الملف | التغيير |
+|-------|---------|
+| `lib/useUpload.ts` | إعادة كتابة — Canvas → Base64 مع iOS fallback |
+| `lib/firebase.js` | إزالة `getStorage` |
+| `app/add-ad/page.tsx` | إزالة `userId` parameter |
+| `app/my-ads/page.tsx` | إزالة `userId` prop |
+| `app/api/upload/route.ts` | حذف |
+| `firebase-rules.md` | **جديد** — قواعد Firestore + Storage |
+| `last-save.md` | توثيق التعديلات |

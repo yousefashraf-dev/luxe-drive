@@ -11,7 +11,7 @@ import Link from 'next/link';
 /* ─── Optimize Cloudinary image URL ─── */
 function optimizeImage(url: string, width: number): string {
   if (!url || !url.includes('res.cloudinary.com')) return url;
-  return url.replace('/upload/', `/upload/w_${width},q_auto/`);
+  return url.replace('/upload/', `/upload/f_auto,w_${width},q_auto/`);
 }
 
 /* ─── detect iOS / Android ─── */
