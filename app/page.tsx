@@ -364,7 +364,7 @@ export default function Home() {
       const cached = localStorage.getItem('luxe_cars_cache');
       if (cached) {
         const { data, ts } = JSON.parse(cached);
-        if (Date.now() - ts < 5 * 60 * 1000) {
+        if (Date.now() - ts < 24 * 60 * 60 * 1000) {
           const sorted = [...data].sort(sortFn);
           setCars(sorted);
           setLoading(false);
@@ -372,7 +372,7 @@ export default function Home() {
       }
     } catch (_) {}
     try {
-      const q = query(collection(db, "cars"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
+      const q = query(collection(db, "cars"), where("status", "==", "active"), orderBy("createdAt", "desc"), limit(PAGE_SIZE));
       const snap = await getDocs(q);
       const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const sorted = [...data].sort(sortFn);
@@ -381,6 +381,8 @@ export default function Home() {
       setHasMore(snap.docs.length === PAGE_SIZE);
       setLoading(false);
       try { localStorage.setItem('luxe_cars_cache', JSON.stringify({ data, ts: Date.now() })); } catch (_) {}
+      const validIds = new Set(data.map(c => c.id));
+      setFavorites(prev => prev.filter(id => validIds.has(id)));
     } catch (err) { console.error("Firebase:", err); setLoading(false); }
   };
 
@@ -390,6 +392,7 @@ export default function Home() {
     try {
       const q = query(
         collection(db, "cars"),
+        where("status", "==", "active"),
         orderBy("createdAt", "desc"),
         startAfter(lastDocRef.current),
         limit(PAGE_SIZE)
