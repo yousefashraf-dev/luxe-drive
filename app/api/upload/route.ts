@@ -1,13 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { v2 as cloudinary } from 'cloudinary';
-
-export const runtime = 'nodejs';
-
-cloudinary.config({
-  cloud_name: process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY,
-  api_secret: process.env.NEXT_PUBLIC_CLOUDINARY_API_SECRET,
-});
 
 export async function POST(req: NextRequest) {
   try {
@@ -17,30 +8,33 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'لم يتم إرسال ملف' }, { status: 400 });
     }
 
-    const buffer = Buffer.from(await file.arrayBuffer());
+    const buffer = await file.arrayBuffer();
+    const blob = new Blob([buffer], { type: file.type });
 
-    const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
-      const stream = cloudinary.uploader.upload_stream(
-        {
-          folder: 'cars',
-          resource_type: 'image',
-          format: 'webp',
-          width: 1200,
-          crop: 'limit',
-          quality: 'auto',
-        },
-        (error, result) => {
-          if (error) reject(error);
-          else resolve(result as { secure_url: string });
-        }
-      );
-      stream.end(buffer);
-    });
+    const body = new FormData();
+    body.append('file', blob, file.name);
+    body.append('upload_preset', 'ml_default');
+    body.append('width', '1200');
+    body.append('crop', 'limit');
+    body.append('quality', 'auto');
+    body.append('format', 'webp');
 
-    return NextResponse.json({ url: result.secure_url });
+    const res = await fetch(
+      `https://api.cloudinary.com/v1_1/${process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME}/image/upload`,
+      { method: 'POST', body }
+    );
+
+    if (!res.ok) {
+      const errMsg = await res.text();
+      console.error('Cloudinary upload failed:', errMsg);
+      return NextResponse.json({ error: `Cloudinary: ${errMsg}` }, { status: 502 });
+    }
+
+    const data = await res.json();
+    return NextResponse.json({ url: data.secure_url });
   } catch (err: unknown) {
     console.error('Upload error:', err);
     const message = err instanceof Error ? err.message : 'خطأ في رفع الصورة';
-    return NextResponse.json({ error: `Cloudinary: ${message}` }, { status: 502 });
+    return NextResponse.json({ error: `Cloudinary: ${message}` }, { status: 500 });
   }
 }
