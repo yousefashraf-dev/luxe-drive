@@ -7,6 +7,9 @@ export interface UploadProgress {
   percent: number;
 }
 
+const CLOUD_NAME = 'dllaxor9r';
+const UPLOAD_PRESET = 'zafah_unsigned';
+
 export async function uploadWithProgress(
   file: File,
   onProgress?: (progress: UploadProgress) => void
@@ -15,22 +18,24 @@ export async function uploadWithProgress(
 
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('upload_preset', UPLOAD_PRESET);
+  formData.append('folder', 'cars');
 
-  onProgress?.({ fileName: file.name, loaded: 50, total: 100, percent: 50 });
+  onProgress?.({ fileName: file.name, loaded: 30, total: 100, percent: 30 });
 
-  const res = await fetch('/api/upload', {
-    method: 'POST',
-    body: formData,
-  });
+  const res = await fetch(
+    `https://api.cloudinary.com/v1_1/${CLOUD_NAME}/image/upload`,
+    { method: 'POST', body: formData }
+  );
 
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.error || 'فشل رفع الصورة');
+    throw new Error(err.error?.message || 'فشل رفع الصورة');
   }
 
   const data = await res.json();
 
   onProgress?.({ fileName: file.name, loaded: 100, total: 100, percent: 100 });
 
-  return data.url;
+  return data.secure_url;
 }
