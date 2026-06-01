@@ -213,6 +213,28 @@ iOS بيحظر HTTP على local network → استخدم Vercel deploy
 | 10 | **💐 كروت مبسّطة للورد والمشاوير** | `app/page.tsx` | الورد/المشاوير: بدون driver/بدون تقويم — فقط صورة + سعر + واتساب + تليفون |
 | 11 | **📦 Suspense boundary** | `app/add-ad/page.tsx` | إضافة `<Suspense>` حول `AddAdContent` لدعم `useSearchParams` |
 
+## ✅ التعديلات — الإصدار v14.1 (1 يونيو 2026) — SEO + Social links
+
+| # | التغيير | الملف | التفاصيل |
+|---|---------|-------|----------|
+| 1 | **🔍 LocalBusiness Schema** | `app/layout.tsx` | Structured data للمنشأة المحلية (العنوان، التليفون، المنطقة، sameAs) |
+| 2 | **🌐 hreflang tags** | `app/layout.tsx` | `link rel="alternate"` للعربي والإنجليزي |
+| 3 | **📄 Sitemap موسّع** | `public/sitemap.xml` | من 3 إلى 5 URLs (إضافة add-ad + admin) |
+| 4 | **📸 أيقونات إنستغرام** | `app/page.tsx` | في موبايل More tab + فوتر ديسك توب (رابط # placeholder) |
+| 5 | **👍 أيقونات فيسبوك** | `app/page.tsx` | في موبايل More tab + فوتر ديسك توب (رابط # placeholder) |
+| 6 | **🗣️ ترجمة social** | `lib/translations.ts` | إضافة `instagram` + `facebook` تحت `more` (عربي + إنجليزي) |
+
+## ✅ التعديلات — الإصدار v14.2 (1 يونيو 2026) — تحسينات UX + LocationPicker
+
+| # | التغيير | الملف | التفاصيل |
+|---|---------|-------|----------|
+| 1 | **🔒 تثبيت body في المودال** | `app/page.tsx` | `overflow: hidden` عند فتح المودال — منع التمرير الخلفي، إحساس App |
+| 2 | **📅 إخفاء التقويم من الورد** | `app/page.tsx` | الورد: صور + سعر + أرقام + وصف فقط (مفيش تقويم/availability) |
+| 3 | **🖥️ ديسك توب "الكل" → أقسام** | `app/page.tsx` | بدل grid مختلط، كل تصنيف قسم horizontal scroll مع CarCard الكبيرة |
+| 4 | **➡️ سهم التمرير الأفقي** | `app/page.tsx` | سهم صغير (Chevron) في كل horizontal section — ديسك توب + موبايل |
+| 5 | **📍 LocationPicker: المحافظة كخيار** | `components/LocationPicker.tsx` | المحافظة نفسها تظهر كأول خيار في قائمة المدن (للمستخدم اللي مش عاوز يحدد مدينة) |
+| 6 | **♾️ Fix infinite scroll** | `app/page.tsx` | إعادة observerRef للـ grid العادي (كان ناقص بعد إضافة الأقسام) |
+
 ---
 
 ## 🎯 SEO — الكلمات المفتاحية المستهدفة
