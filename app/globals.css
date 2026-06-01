@@ -23,10 +23,14 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  /* الخط الأساسي Cairo للعربي و Inter للإنكليزي */
-  font-family: var(--font-cairo), var(--font-inter), ui-sans-serif, system-ui;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+[dir="rtl"] body {
+  font-family: var(--font-cairo), var(--font-inter), ui-sans-serif, system-ui;
+}
+[dir="ltr"] body {
+  font-family: var(--font-inter), var(--font-cairo), ui-sans-serif, system-ui;
 }
 /* تحسين شكل الـ Scrollbar عشان يكمل اللمسة الفخمة */
 ::-webkit-scrollbar {
@@ -60,4 +64,54 @@ html {
 .fixed.inset-0 {
   -webkit-transform: translateZ(0);
   transform: translateZ(0);
+}
+
+/* Shimmer loading animation */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0.05) 25%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* iOS safe area for bottom nav */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Hide scrollbar for mobile chips */
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Horizontal scroll snaps */
+.snap-x {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.snap-center {
+  scroll-snap-align: center;
+}
+
+/* Better touch handling on mobile */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Bottom nav safe area extra */
+.safe-area-bottom {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 4px);
+}
+
+/* Image no-select/drag */
+img {
+  -webkit-user-drag: none;
+  user-select: none;
 }

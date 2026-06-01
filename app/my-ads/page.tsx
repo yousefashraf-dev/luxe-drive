@@ -1,22 +1,26 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, startTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, query, where, onSnapshot, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
-import { ArrowLeft, Car, Eye, Calendar, DollarSign, Phone, FileText, Image as ImageIcon, Edit3, X, ChevronRight, ChevronLeft, Star, Save, Flower2, Heart, Navigation } from 'lucide-react';
+import { ArrowLeft, Car, Eye, Edit3, X, ChevronRight, ChevronLeft, Star, Save, Flower2, Heart, Navigation, Image as ImageIcon } from 'lucide-react';
 import { formatPhone } from '@/lib/utils';
 import { uploadWithProgress } from '@/lib/useUpload';
+import { useLanguage } from '@/lib/LanguageContext';
+import { useToast } from '@/components/Toast';
+import LocationPicker from '@/components/LocationPicker';
 
-const LOCATIONS = ['المنوفية', 'القاهرة', 'الجيزة', 'طنطا', 'المنصورة', 'بنها', 'شبين الكوم', 'الإسكندرية'];
 
-function CalendarPicker({ bookedDays, onToggle }) {
+
+function CalendarPicker({ bookedDays, onToggle }: { bookedDays: number[]; onToggle: (day: number) => void }) {
+  const { t } = useLanguage();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
-  const monthNames = ['يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  const monthNames = t.calendar.monthNames;
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const blanks = Array.from({ length: firstDay });
@@ -27,15 +31,15 @@ function CalendarPicker({ bookedDays, onToggle }) {
     <div className="bg-white rounded-[1.5rem] border border-zinc-200 shadow-sm p-4">
       <div className="flex items-center justify-between mb-2">
         <button type="button" onClick={prevMonth} className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 transition-all text-[11px] font-medium text-zinc-600">
-          <ChevronRight size={14} /> السابق
+          <ChevronRight size={14} /> {t.calendar.prev}
         </button>
         <p className="text-[15px] font-bold text-black">{monthNames[month]} <span className="text-zinc-400">{year}</span></p>
         <button type="button" onClick={nextMonth} className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 transition-all text-[11px] font-medium text-zinc-600">
-          التالي <ChevronLeft size={14} />
+          {t.calendar.next} <ChevronLeft size={14} />
         </button>
       </div>
       <div className="grid grid-cols-7 gap-1 mb-2">
-        {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => <div key={d} className="text-[7px] font-black uppercase text-zinc-300 text-center">{d}</div>)}
+        {[t.calendar.su, t.calendar.mo, t.calendar.tu, t.calendar.we, t.calendar.th, t.calendar.fr, t.calendar.sa].map(d => <div key={d} className="text-[7px] font-black uppercase text-zinc-300 text-center">{d}</div>)}
       </div>
       <div className="grid grid-cols-7 gap-1 text-center">
         {blanks.map((_, i) => <div key={`b${i}`} />)}
@@ -50,12 +54,14 @@ function CalendarPicker({ bookedDays, onToggle }) {
           );
         })}
       </div>
-      <p className="text-[9px] text-center text-red-400 mt-3">🔴 حدد الأيام اللي العربية فيها محجوزة</p>
+      <p className="text-[9px] text-center text-red-400 mt-3">{t.addAd.fields.bookedDaysHint}</p>
     </div>
   );
 }
 
-function EditModal({ ad, onClose, onSaved }) {
+function EditModal({ ad, onClose, onSaved }: { ad: any; onClose: () => void; onSaved: () => void }) {
+  const { t } = useLanguage();
+  const { toast } = useToast();
   const [name, setName] = useState(ad.name || '');
   const [price, setPrice] = useState(ad.price || '');
   const [description, setDescription] = useState(ad.description || '');
@@ -67,11 +73,12 @@ function EditModal({ ad, onClose, onSaved }) {
   const [driver, setDriver] = useState(ad.driver || 'without');
   const [fromLocation, setFromLocation] = useState(ad.fromLocation || '');
   const [toLocation, setToLocation] = useState(ad.toLocation || '');
+  const [packageDetails, setPackageDetails] = useState(ad.packageDetails || '');
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{current: number; total: number; percent: number} | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const handleToggleDay = (day) => {
+  const handleToggleDay = (day: number) => {
     setBookedDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
   };
 
@@ -85,7 +92,11 @@ function EditModal({ ad, onClose, onSaved }) {
         location, image: images,
         updatedAt: serverTimestamp()
       };
-      if (ad.category === 'trip') {
+      if (ad.category === 'car_package') {
+        updateData.packageDetails = packageDetails;
+        updateData.bookedDays = [];
+        updateData.driver = null;
+      } else if (ad.category === 'trip') {
         updateData.fromLocation = fromLocation;
         updateData.toLocation = toLocation;
         updateData.driver = null;
@@ -95,14 +106,15 @@ function EditModal({ ad, onClose, onSaved }) {
         updateData.bookedDays = bookedDays;
       }
       await updateDoc(doc(db, "cars", ad.id), updateData);
-      alert('تم الحفظ! ✅');
+      toast(t.myAds.saved, 'success');
       onSaved();
       onClose();
-    } catch (e) { alert('فشل الحفظ'); }
+    } catch { toast(t.myAds.saveFailed, 'error'); }
     finally { setSubmitting(false); }
   };
 
   const isTrip = ad.category === 'trip';
+  const isPackage = ad.category === 'car_package';
 
   return (
     <div className="fixed inset-0 z-[300] bg-black/70 backdrop-blur-md flex items-end md:items-center justify-center p-0 md:p-6" onClick={e => { if (e.target === e.currentTarget) onClose(); }}>
@@ -110,55 +122,59 @@ function EditModal({ ad, onClose, onSaved }) {
         <button onClick={onClose} className="absolute top-4 right-4 w-9 h-9 rounded-full bg-zinc-100 flex items-center justify-center hover:bg-zinc-200 transition-all">
           <X size={16} />
         </button>
-        <h2 className="font-serif text-2xl italic mb-6">تعديل الإعلان</h2>
+        <h2 className="font-serif text-2xl italic mb-6">{t.myAds.editTitle}</h2>
 
         <div className="space-y-5">
           {ad.bouquetName ? (
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">اسم البوكيه</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.bouquetName}</label>
               <input value={name} onChange={e => setName(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
             </div>
           ) : isTrip ? (
             <>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">اسم المشوار</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.tripName}</label>
                 <input value={name} onChange={e => setName(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">من</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.from}</label>
                   <input value={fromLocation} onChange={e => setFromLocation(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">إلى</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.to}</label>
                   <input value={toLocation} onChange={e => setToLocation(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
                 </div>
+              </div>
+            </>
+          ) : isPackage ? (
+            <>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.packageName}</label>
+                <input value={name} onChange={e => setName(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
+              </div>
+              <div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.packageDetails}</label>
+                <textarea value={packageDetails} onChange={e => setPackageDetails(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black h-32 resize-none font-mono" />
               </div>
             </>
           ) : (
             <>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">اسم العربية</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.carName}</label>
                 <input value={name} onChange={e => setName(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">المدينة</label>
-                <div className="flex flex-wrap gap-2">
-                  {LOCATIONS.map(loc => (
-                    <button key={loc} type="button" onClick={() => setLocation(loc)}
-                      className={`px-4 py-2 rounded-full text-[11px] font-bold transition-all border ${
-                        location === loc ? 'bg-black text-white border-black' : 'border-zinc-200 text-zinc-500 hover:border-zinc-400'
-                      }`}>{loc}</button>
-                  ))}
-                </div>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.location}</label>
+                <LocationPicker value={location} onChange={setLocation} />
               </div>
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">السواق</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.steps.driver}</label>
                 <div className="flex gap-2">
                   {[
-                    { key: 'with', label: '👤 بسائق' },
-                    { key: 'without', label: '🚗 بدون سائق' },
-                    { key: 'both', label: '👤 سائق وبدون' },
+                    { key: 'with', label: t.addAd.driverOptions.with },
+                    { key: 'without', label: t.addAd.driverOptions.without },
+                    { key: 'both', label: t.addAd.driverOptions.both },
                   ].map(opt => (
                     <button key={opt.key} type="button" onClick={() => setDriver(opt.key)}
                       className={`px-4 py-2 rounded-full text-[11px] font-bold transition-all border ${
@@ -172,33 +188,33 @@ function EditModal({ ad, onClose, onSaved }) {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">السعر</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.price}</label>
               <input value={price} onChange={e => setPrice(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
             </div>
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">رقم الاتصال</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.phone}</label>
               <input value={phone} onChange={e => setPhone(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
             </div>
           </div>
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">واتساب (اختياري — لو مختلف عن رقم الاتصال)</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.whatsapp}</label>
             <input value={whatsapp} onChange={e => setWhatsapp(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black" />
           </div>
 
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">الوصف</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.description}</label>
             <textarea value={description} onChange={e => setDescription(e.target.value)} className="w-full border border-zinc-200 p-4 rounded-2xl outline-none focus:border-black h-24 resize-none" />
           </div>
 
-          {!ad.bouquetName && !isTrip && (
+          {!ad.bouquetName && !isTrip && !isPackage && (
             <div>
-              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">الأيام المحجوزة</label>
+              <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.bookedDays}</label>
               <CalendarPicker bookedDays={bookedDays} onToggle={handleToggleDay} />
             </div>
           )}
 
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">الصور</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 block mb-2">{t.addAd.fields.images}</label>
             <input type="file" accept="image/*" multiple
               onChange={async (e) => {
                 const files = Array.from(e.target.files || []);
@@ -212,8 +228,8 @@ function EditModal({ ad, onClose, onSaved }) {
                     });
                     setImages(prev => [...prev, url]);
                   } catch (err: unknown) {
-                    const msg = err instanceof Error ? err.message : 'خطأ غير معروف';
-                    alert(`فشل رفع ${files[i].name}: ${msg}`);
+                    const msg = err instanceof Error ? err.message : t.addAd.errors.generic;
+                    toast(`${t.addAd.fields.uploading} ${files[i].name}: ${msg}`, 'error');
                   }
                 }
                 setUploadProgress(null);
@@ -227,7 +243,7 @@ function EditModal({ ad, onClose, onSaved }) {
                 <div className="flex flex-col items-center gap-2 w-full max-w-xs">
                   <div className="flex items-center gap-2 text-zinc-500">
                     <div className="w-4 h-4 border-2 border-zinc-400 border-t-zinc-600 rounded-full animate-spin" />
-                    <span>رفع الصورة {uploadProgress.current} من {uploadProgress.total}</span>
+                      <span>{t.addAd.fields.imagesUploading} {uploadProgress.current} {t.addAd.fields.of} {uploadProgress.total}</span>
                   </div>
                   <div className="w-full h-1.5 bg-zinc-100 rounded-full overflow-hidden">
                     <div className="h-full bg-black rounded-full transition-all duration-300"
@@ -236,14 +252,14 @@ function EditModal({ ad, onClose, onSaved }) {
                   <span className="text-zinc-400 text-[10px]">{uploadProgress.percent}%</span>
                 </div>
               ) : (
-                <><ImageIcon size={24} />{images.length > 0 ? `${images.length} صور` : 'رفع صور'}</>
+                <><ImageIcon size={24} />{images.length > 0 ? `${images.length} ${t.addAd.fields.imagesCount}` : t.addAd.fields.imagesUpload}</>
               )}
             </label>
             {images.length > 0 && (
               <div className="flex flex-wrap gap-3 mt-4">
                 {images.map((url, i) => (
                   <div key={i} className="relative group">
-                    <img src={url} className="w-16 h-16 object-cover rounded-xl border" />
+                    <img src={url} alt="Uploaded preview" className="w-16 h-16 object-cover rounded-xl border" />
                     <button type="button" onClick={() => setImages(p => p.filter((_, idx) => idx !== i))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100">✕</button>
                   </div>
                 ))}
@@ -253,7 +269,7 @@ function EditModal({ ad, onClose, onSaved }) {
 
           <button onClick={handleSave} disabled={submitting}
             className="w-full bg-black text-white py-5 rounded-[2rem] font-bold text-[11px] uppercase tracking-[0.3em] shadow-lg hover:bg-zinc-800 transition-all active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2">
-            <Save size={16} /> {submitting ? 'جاري الحفظ...' : 'حفظ التعديلات'}
+            <Save size={16} /> {submitting ? t.myAds.saving : t.myAds.save}
           </button>
         </div>
       </div>
@@ -262,10 +278,18 @@ function EditModal({ ad, onClose, onSaved }) {
 }
 
 export default function MyAdsPage() {
-  const { user, userProfile, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const [myCars, setMyCars] = useState<any[]>([]);
   const [editingAd, setEditingAd] = useState<any>(null);
+  const [now, setNow] = useState<number>(0);
+
+  useEffect(() => {
+    startTransition(() => setNow(Date.now()));
+    const id = setInterval(() => startTransition(() => setNow(Date.now())), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!authLoading && !user) router.push('/');
@@ -275,7 +299,7 @@ export default function MyAdsPage() {
     if (!user) return;
     const q = query(collection(db, "cars"), where("userId", "==", user.uid));
     const unsub = onSnapshot(q, (snap) => {
-      const data = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const data: any[] = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       const suspendedRefs: Promise<void>[] = [];
       data.forEach(ad => {
         if (ad.status !== 'active') return;
@@ -286,28 +310,27 @@ export default function MyAdsPage() {
         }
       });
       if (suspendedRefs.length > 0) {
-        Promise.all(suspendedRefs).catch(() => {});
+        Promise.all(suspendedRefs).catch(() => {/* ignore */});
       }
       setMyCars(data.sort((a, b) => {
         const aTime = a.createdAt?.toMillis?.() || a.createdAt || 0;
         const bTime = b.createdAt?.toMillis?.() || b.createdAt || 0;
         return bTime - aTime;
       }));
-    }, (err) => console.error("MyAds error:", err));
+    });
     return () => unsub();
   }, [user]);
 
   if (authLoading) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
-      <p className="text-white font-serif italic animate-pulse text-2xl">Loading...</p>
+      <p className="text-white font-serif italic animate-pulse text-2xl">{t.common.loading}</p>
     </div>
   );
 
-  const daysLeft = (expiryDate) => {
+  const daysLeft = (expiryDate: any, now: number) => {
     if (!expiryDate) return null;
     const exp = expiryDate.toDate ? expiryDate.toDate() : new Date(expiryDate);
-    const diff = Math.ceil((exp.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
-    return diff;
+    return Math.ceil((exp.getTime() - now) / (1000 * 60 * 60 * 24));
   };
 
   return (
@@ -318,29 +341,29 @@ export default function MyAdsPage() {
         </button>
         <div className="flex items-center gap-3">
           <Heart size={18} className="text-[#c5a059]" />
-          <p className="font-serif text-xl italic">إعلاناتي</p>
+          <p className="font-serif text-xl italic">{t.myAds.title}</p>
         </div>
       </nav>
 
-      <div className="max-w-5xl mx-auto px-6 md:px-12 py-12">
+      <div className="max-w-5xl mx-auto px-4 md:px-12 py-8 md:py-12">
         {myCars.length === 0 ? (
           <div className="text-center py-20">
             <Car size={48} className="mx-auto text-zinc-200 mb-6" />
-            <p className="text-zinc-400 text-lg font-serif italic">ما عندكش إعلانات منشورة</p>
+            <p className="text-zinc-400 text-lg font-serif italic">{t.myAds.noAds}</p>
             <button onClick={() => router.push('/add-ad')} className="mt-6 bg-black text-white px-8 py-4 rounded-full text-[10px] font-bold uppercase tracking-[3px] hover:bg-zinc-800 transition-all">
-              أضف إعلان جديد
+              {t.myAds.addNew}
             </button>
           </div>
         ) : (
-          <div className="space-y-6">
+          <div className="space-y-4 md:space-y-6">
             {myCars.map(ad => {
-              const dLeft = daysLeft(ad.expiryDate);
+              const dLeft = daysLeft(ad.expiryDate, now);
               const isFlower = ad.category === 'flowers' || ad.bouquetName;
               return (
-                <div key={ad.id} className="bg-white p-6 md:p-8 rounded-[2.5rem] shadow-sm border border-gray-50 hover:shadow-xl transition-all duration-500">
-                  <div className="flex flex-col md:flex-row gap-6">
-                    <div className="relative w-full md:w-48 h-40 rounded-[1.5rem] overflow-hidden shadow-md flex-shrink-0">
-                      <img src={Array.isArray(ad.image) ? ad.image[0] : ad.image} className="w-full h-full object-cover" />
+                <div key={ad.id} className="bg-white p-4 md:p-8 rounded-2xl md:rounded-[2.5rem] shadow-sm border border-gray-50 hover:shadow-xl transition-all duration-500">
+                  <div className="flex flex-col md:flex-row gap-3 md:gap-6">
+                    <div className="relative w-full md:w-48 h-32 md:h-40 rounded-xl md:rounded-[1.5rem] overflow-hidden shadow-md flex-shrink-0">
+                      <img src={Array.isArray(ad.image) ? ad.image[0] : ad.image} alt={ad.name} className="w-full h-full object-cover" />
                       {ad.isVIP && (
                         <div className="absolute top-3 left-3 bg-[#D4AF37] text-white px-2 py-1 rounded-full flex items-center gap-1">
                           <Star size={10} fill="white" />
@@ -349,21 +372,21 @@ export default function MyAdsPage() {
                       )}
                     </div>
                     <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-serif text-2xl italic">{ad.name}</h3>
+                      <div className="flex items-center gap-2 md:gap-3 mb-1 md:mb-2">
+                        <h3 className="font-serif text-lg md:text-2xl italic">{ad.name}</h3>
                         <span className={`px-3 py-1 rounded-full text-[8px] font-bold uppercase tracking-widest ${
                           ad.status === 'active' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-400 border border-red-100'
                         }`}>
-                          {ad.status === 'active' ? 'منشور' : 'معلق'}
+                          {ad.status === 'active' ? t.myAds.status.active : t.myAds.status.suspended}
                         </span>
                         {isFlower && <Flower2 size={16} className="text-pink-400" />}
                 {ad.category === 'trip' && <Navigation size={16} className="text-blue-400" />}
                       </div>
-                      <div className="flex flex-wrap gap-4 items-center text-[11px] text-zinc-500">
+                      <div className="flex flex-wrap gap-2 md:gap-4 items-center text-[10px] md:text-[11px] text-zinc-500">
                         <span className="font-bold">{ad.price} EGP</span>
                         <div className="flex items-center gap-1">
                           <Eye size={13} className="text-blue-500" />
-                          <span>{ad.views || 0} مشاهدة</span>
+                          <span>{ad.views || 0} {t.myAds.viewCount}</span>
                         </div>
                         {ad.category === 'trip' && ad.fromLocation && ad.toLocation ? (
                           <span>🗺️ <span dir="ltr">{ad.fromLocation} → {ad.toLocation}</span></span>
@@ -372,28 +395,28 @@ export default function MyAdsPage() {
                         ) : null}
                         {dLeft !== null && dLeft !== undefined && (
                           <span className={dLeft <= 2 ? 'text-red-500 font-bold' : ''}>
-                            ⏰ متبقي {dLeft} يوم
+                            {t.myAds.daysLeft} {dLeft} {t.myAds.day}
                           </span>
                         )}
                         {dLeft !== null && dLeft !== undefined && dLeft <= 2 && dLeft > 0 && (
                           <span className="text-red-500 text-[9px] font-bold bg-red-50 px-3 py-1 rounded-full">
-                            ⚠️ هينتهي قريب!
+                            {t.myAds.expiryWarning}
                           </span>
                         )}
                       </div>
                       {ad.description && (
-                        <p className="text-zinc-400 text-[12px] mt-3 line-clamp-2">{ad.description}</p>
+                        <p className="text-zinc-400 text-[11px] md:text-[12px] mt-2 md:mt-3 line-clamp-2">{ad.description}</p>
                       )}
                     </div>
-                    <div className="flex md:flex-col gap-3 md:justify-center">
+                    <div className="flex md:flex-col gap-2 md:gap-3 md:justify-center">
                       <button onClick={() => setEditingAd(ad)}
-                        className="flex items-center justify-center gap-2 px-6 py-4 bg-black text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 transition-all shadow-sm active:scale-95">
-                        <Edit3 size={14} /> تعديل
+                        className="flex items-center justify-center gap-1 md:gap-2 px-4 md:px-6 py-3 md:py-4 bg-black text-white rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-bold uppercase tracking-widest hover:bg-zinc-800 transition-all shadow-sm active:scale-95">
+                        <Edit3 size={12} className="md:w-[14px] md:h-[14px]" /> {t.myAds.edit}
                       </button>
                       {(ad.status !== 'active' || (dLeft !== null && dLeft <= 0)) && (
-                        <a href={`https://wa.me/201095976766?text=${encodeURIComponent('عاوز أجدد إعلان ' + ad.name)}`} target="_blank"
-                          className="flex items-center justify-center gap-2 px-6 py-4 bg-[#25D366] text-white rounded-2xl text-[10px] font-bold uppercase tracking-widest hover:bg-[#20bd5a] transition-all shadow-sm active:scale-95">
-                          🔄 جدد الإعلان
+                        <a href={`https://wa.me/201095976766?text=${encodeURIComponent(t.myAds.renewMsg + ' ' + ad.name)}`} target="_blank"
+                          className="flex items-center justify-center gap-1 md:gap-2 px-4 md:px-6 py-3 md:py-4 bg-[#25D366] text-white rounded-xl md:rounded-2xl text-[9px] md:text-[10px] font-bold uppercase tracking-widest hover:bg-[#20bd5a] transition-all shadow-sm active:scale-95">
+                          {t.myAds.renew}
                         </a>
                       )}
                     </div>

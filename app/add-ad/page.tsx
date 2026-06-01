@@ -1,23 +1,26 @@
-// @ts-nocheck
 'use client';
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useState, useEffect } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/AuthContext';
 import { db } from '@/lib/firebase';
 import { collection, addDoc, doc, getDoc, updateDoc, serverTimestamp } from 'firebase/firestore';
 
-import { ArrowLeft, Car, Flower2, DollarSign, Phone, MapPin, FileText, Image as ImageIcon, ChevronRight, ChevronLeft, X, User, Calendar, Navigation } from 'lucide-react';
+import { ArrowLeft, Car, Flower2, DollarSign, Phone, Image as ImageIcon, ChevronRight, ChevronLeft, User, Navigation } from 'lucide-react';
 import { formatPhone } from '@/lib/utils';
 import { uploadWithProgress } from '@/lib/useUpload';
+import { useLanguage } from '@/lib/LanguageContext';
+import { useToast } from '@/components/Toast';
+import LocationPicker from '@/components/LocationPicker';
 
-const LOCATIONS = ['المنوفية', 'القاهرة', 'الجيزة', 'طنطا', 'المنصورة', 'بنها', 'شبين الكوم', 'الإسكندرية'];
 
-function CalendarPicker({ bookedDays, onToggle }) {
+
+function CalendarPicker({ bookedDays, onToggle }: { bookedDays: number[]; onToggle: (day: number) => void }) {
+  const { t } = useLanguage();
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [month, setMonth] = useState(today.getMonth());
 
-  const monthNames = ['يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+  const monthNames = t.calendar.monthNames;
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const blanks = Array.from({ length: firstDay });
@@ -30,15 +33,15 @@ function CalendarPicker({ bookedDays, onToggle }) {
     <div className="bg-white rounded-[1.5rem] border border-zinc-200 shadow-sm p-4 md:p-6">
       <div className="flex items-center justify-between mb-2">
         <button type="button" onClick={prevMonth} className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 transition-all text-[11px] font-medium text-zinc-600">
-          <ChevronRight size={14} /> السابق
+          <ChevronRight size={14} /> {t.calendar.prev}
         </button>
         <p className="text-[15px] font-bold text-black">{monthNames[month]} <span className="text-zinc-400">{year}</span></p>
         <button type="button" onClick={nextMonth} className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 transition-all text-[11px] font-medium text-zinc-600">
-          التالي <ChevronLeft size={14} />
+          {t.calendar.next} <ChevronLeft size={14} />
         </button>
       </div>
       <div className="grid grid-cols-7 gap-1 mb-2">
-        {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map(d => (
+        {[t.calendar.su, t.calendar.mo, t.calendar.tu, t.calendar.we, t.calendar.th, t.calendar.fr, t.calendar.sa].map(d => (
           <div key={d} className="text-[7px] font-black uppercase text-zinc-300 text-center">{d}</div>
         ))}
       </div>
@@ -57,23 +60,26 @@ function CalendarPicker({ bookedDays, onToggle }) {
           );
         })}
       </div>
-      <p className="text-[9px] text-center text-red-400 mt-4">🔴 حدد الأيام اللي العربية فيها محجوزة</p>
+      <p className="text-[9px] text-center text-red-400 mt-4">{t.addAd.fields.bookedDaysHint}</p>
     </div>
   );
 }
 
-export default function AddAdPage() {
+function AddAdContent() {
   const { user, userProfile, loading: authLoading } = useAuth();
+  const { t, lang } = useLanguage();
+  const { toast } = useToast();
   const router = useRouter();
-  const [editId, setEditId] = useState<string | null>(null);
+  const searchParams = useSearchParams();
+  const editId = searchParams.get('edit');
   const [editMode, setEditMode] = useState(false);
   const [step, setStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<{current: number; total: number; percent: number} | null>(null);
 
-  // Step 0: Car, Flowers, or Trip
-  const [type, setType] = useState<'car' | 'flowers' | 'trip' | null>(null);
+  // Step 0: Car, Flowers, Trip, or Package
+  const [type, setType] = useState<'car' | 'flowers' | 'trip' | 'package' | null>(null);
   // Step 1 (car): wedding or rental
   const [carType, setCarType] = useState<'wedding' | 'rental' | null>(null);
   // Step 2 (car): with or without driver
@@ -96,14 +102,12 @@ export default function AddAdPage() {
   const [fromLocation, setFromLocation] = useState('');
   const [toLocation, setToLocation] = useState('');
 
+  // Package-specific
+  const [packageDetails, setPackageDetails] = useState('');
+
   useEffect(() => {
     if (!authLoading && !user) router.push('/');
   }, [authLoading, user, router]);
-
-  useEffect(() => {
-    const id = new URLSearchParams(window.location.search).get('edit');
-    if (id) setEditId(id);
-  }, []);
 
   useEffect(() => {
     if (!editId) return;
@@ -120,6 +124,10 @@ export default function AddAdPage() {
             setName(data.name || '');
             setFromLocation(data.fromLocation || '');
             setToLocation(data.toLocation || '');
+          } else if (data.category === 'car_package') {
+            setType('package');
+            setName(data.name || '');
+            setPackageDetails(data.packageDetails || '');
           } else {
             setType('car');
             setCarType(data.category === 'car_wedding' ? 'wedding' : 'rental');
@@ -138,7 +146,7 @@ export default function AddAdPage() {
         }
       } catch (err) {
         console.error('Failed to load ad:', err);
-        alert('فشل تحميل بيانات الإعلان');
+        toast(t.addAd.errors.loadFailed, 'error');
       }
     };
     loadAd();
@@ -150,7 +158,7 @@ export default function AddAdPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (images.length === 0) { alert("⚠️ لازم ترفع صورة واحدة على الأقل!"); return; }
+    if (images.length === 0) { toast(t.addAd.errors.noImage, 'error'); return; }
     setSubmitting(true);
     try {
       const adData = {
@@ -161,12 +169,13 @@ export default function AddAdPage() {
         phone: formatPhone(phone),
         whatsapp: whatsapp ? formatPhone(whatsapp) : '',
         location,
-        bookedDays,
-        category: type === 'flowers' ? 'flowers' : type === 'trip' ? 'trip' : carType === 'wedding' ? 'car_wedding' : 'car_rental',
-        driver: type === 'flowers' || type === 'trip' ? null : driver,
+        bookedDays: type === 'package' ? [] : bookedDays,
+        category: type === 'flowers' ? 'flowers' : type === 'trip' ? 'trip' : type === 'package' ? 'car_package' : carType === 'wedding' ? 'car_wedding' : 'car_rental',
+        driver: type === 'flowers' || type === 'trip' || type === 'package' ? null : driver,
         bouquetName: type === 'flowers' ? bouquetName : '',
         fromLocation: type === 'trip' ? fromLocation : '',
         toLocation: type === 'trip' ? toLocation : '',
+        packageDetails: type === 'package' ? packageDetails : '',
         userId: user?.uid || '',
         userEmail: user?.email || '',
         status: 'suspended',
@@ -182,22 +191,22 @@ export default function AddAdPage() {
           ...updateFields,
           updatedAt: serverTimestamp(),
         });
-        alert('تم تعديل الإعلان! ✅');
+        toast(t.addAd.errors.saved, 'success');
       } else {
         await addDoc(collection(db, 'cars'), adData);
-        alert('تم إرسال الإعلان! ✅ في انتظار مراجعة الإدارة.');
+        toast(t.addAd.errors.submitted, 'success');
       }
 
       router.push('/my-ads');
     } catch (err) {
       console.error(err);
-      alert('حدث خطأ، حاول تاني');
+      toast(t.addAd.errors.generic, 'error');
     } finally { setSubmitting(false); }
   };
 
   if (authLoading) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
-      <p className="text-white text-xl animate-pulse font-serif italic">Loading...</p>
+      <p className="text-white text-xl animate-pulse font-serif italic">{t.common.loading}</p>
     </div>
   );
 
@@ -214,7 +223,7 @@ export default function AddAdPage() {
           <ArrowLeft size={16} />
         </button>
         <div className="flex-1">
-          <p className="font-serif text-lg italic">{editMode ? 'Edit Listing' : 'New Listing'}</p>
+          <p className="font-serif text-lg italic">{editMode ? t.addAd.editListing : t.addAd.newListing}</p>
           <div className="h-1 bg-zinc-800 rounded-full mt-2 overflow-hidden">
             <div className="h-full bg-[#c5a059] rounded-full transition-all duration-500" style={{ width: `${progress}%` }} />
           </div>
@@ -227,33 +236,41 @@ export default function AddAdPage() {
           {step === 0 && (
             <div className="space-y-8">
               <div className="text-center">
-                <p className="text-[9px] tracking-[5px] uppercase text-zinc-500 font-bold">Step 1</p>
-                <h2 className="font-serif text-3xl italic mt-2">إيه اللي عاوز تنشره؟</h2>
+                <p className="text-[9px] tracking-[5px] uppercase text-zinc-500 font-bold">{t.addAd.steps.chooseType}</p>
+                <h2 className="font-serif text-3xl italic mt-2">{t.addAd.title}</h2>
               </div>
-              <div className="grid grid-cols-3 gap-4 md:gap-6">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <button type="button" onClick={() => { setType('car'); setStep(1); }}
-                  className={`p-8 md:p-10 rounded-[2.5rem] border-2 transition-all duration-300 text-center group ${
+                  className={`p-6 md:p-8 rounded-[2rem] border-2 transition-all duration-300 text-center group ${
                     type === 'car' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
-                  <Car size={40} className={`mx-auto mb-3 ${type === 'car' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
-                  <p className="text-base md:text-lg font-bold">🚗 Car</p>
-                  <p className="text-[9px] text-zinc-500 mt-2">Wedding / Rental</p>
+                  <Car size={32} className={`mx-auto mb-3 ${type === 'car' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
+                  <p className="text-sm md:text-base font-bold">{t.addAd.types.car}</p>
+                  <p className="text-[8px] text-zinc-500 mt-1">{t.addAd.types.carSub}</p>
+                </button>
+                <button type="button" onClick={() => { setType('package'); setStep(3); }}
+                  className={`p-6 md:p-8 rounded-[2rem] border-2 transition-all duration-300 text-center group ${
+                    type === 'package' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
+                  }`}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={`w-8 h-8 mx-auto mb-3 ${type === 'package' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`}><path d="M16.5 9.4 7.55 4.24a1 1 0 0 0-1.1 0L2 6.5M7.5 12.5l-4.24-2.44M12 12.5l-4.24-2.44M7.5 20.5V8.5"/><path d="M22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6"/><path d="M18 6V2h-4"/><path d="M14 6V2h-4"/><path d="M10 6V2H6"/></svg>
+                  <p className="text-sm md:text-base font-bold">{t.addAd.types.package}</p>
+                  <p className="text-[8px] text-zinc-500 mt-1">{t.addAd.types.packageSub}</p>
                 </button>
                 <button type="button" onClick={() => { setType('flowers'); setStep(3); }}
-                  className={`p-8 md:p-10 rounded-[2.5rem] border-2 transition-all duration-300 text-center group ${
+                  className={`p-6 md:p-8 rounded-[2rem] border-2 transition-all duration-300 text-center group ${
                     type === 'flowers' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
-                  <Flower2 size={40} className={`mx-auto mb-3 ${type === 'flowers' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
-                  <p className="text-base md:text-lg font-bold">💐 Flowers</p>
-                  <p className="text-[9px] text-zinc-500 mt-2">Bouquets</p>
+                  <Flower2 size={32} className={`mx-auto mb-3 ${type === 'flowers' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
+                  <p className="text-sm md:text-base font-bold">{t.addAd.types.flowers}</p>
+                  <p className="text-[8px] text-zinc-500 mt-1">{t.addAd.types.flowersSub}</p>
                 </button>
                 <button type="button" onClick={() => { setType('trip'); setStep(3); }}
-                  className={`p-8 md:p-10 rounded-[2.5rem] border-2 transition-all duration-300 text-center group ${
+                  className={`p-6 md:p-8 rounded-[2rem] border-2 transition-all duration-300 text-center group ${
                     type === 'trip' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
-                  <Navigation size={40} className={`mx-auto mb-3 ${type === 'trip' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
-                  <p className="text-base md:text-lg font-bold">🗺️ Trips</p>
-                  <p className="text-[9px] text-zinc-500 mt-2">Point-to-point</p>
+                  <Navigation size={32} className={`mx-auto mb-3 ${type === 'trip' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
+                  <p className="text-sm md:text-base font-bold">{t.addAd.types.trip}</p>
+                  <p className="text-[8px] text-zinc-500 mt-1">{t.addAd.types.tripSub}</p>
                 </button>
               </div>
             </div>
@@ -263,8 +280,8 @@ export default function AddAdPage() {
           {step === 1 && type === 'car' && (
             <div className="space-y-8">
               <div className="text-center">
-                <p className="text-[9px] tracking-[5px] uppercase text-zinc-500 font-bold">Step 2</p>
-                <h2 className="font-serif text-3xl italic mt-2">نوع الخدمة؟</h2>
+                <p className="text-[9px] tracking-[5px] uppercase text-zinc-500 font-bold">{t.addAd.steps.serviceType}</p>
+                <h2 className="font-serif text-3xl italic mt-2">{t.addAd.steps.serviceType}</h2>
               </div>
               <div className="grid grid-cols-2 gap-6">
                 <button type="button" onClick={() => { setCarType('wedding'); setStep(2); }}
@@ -272,16 +289,16 @@ export default function AddAdPage() {
                     carType === 'wedding' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
                   <p className="text-4xl mb-3">🎊</p>
-                  <p className="text-lg font-bold">zafah</p>
-                  <p className="text-[10px] text-zinc-500 mt-2">سيارات الزفاف</p>
+                  <p className="text-lg font-bold">{t.addAd.carType.wedding}</p>
+                  <p className="text-[10px] text-zinc-500 mt-2">{t.addAd.carType.weddingSub}</p>
                 </button>
                 <button type="button" onClick={() => { setCarType('rental'); setStep(2); }}
                   className={`p-10 rounded-[2.5rem] border-2 transition-all text-center group ${
                     carType === 'rental' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
                   <p className="text-4xl mb-3">🚙</p>
-                  <p className="text-lg font-bold">Car Rental</p>
-                  <p className="text-[10px] text-zinc-500 mt-2">تأجير يومي</p>
+                  <p className="text-lg font-bold">{t.addAd.carType.rental}</p>
+                  <p className="text-[10px] text-zinc-500 mt-2">{t.addAd.carType.rentalSub}</p>
                 </button>
               </div>
             </div>
@@ -291,8 +308,8 @@ export default function AddAdPage() {
           {step === 2 && type === 'car' && (
             <div className="space-y-8">
               <div className="text-center">
-                <p className="text-[9px] tracking-[5px] uppercase text-zinc-500 font-bold">Step 3</p>
-                <h2 className="font-serif text-3xl italic mt-2">عاوز سواق؟</h2>
+                <p className="text-[9px] tracking-[5px] uppercase text-zinc-500 font-bold">{t.addAd.steps.driver}</p>
+                <h2 className="font-serif text-3xl italic mt-2">{t.addAd.steps.driver}</h2>
               </div>
               <div className="grid grid-cols-3 gap-4">
                 <button type="button" onClick={() => { setDriver('with'); setStep(3); }}
@@ -300,24 +317,24 @@ export default function AddAdPage() {
                     driver === 'with' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
                   <User size={28} className={`mx-auto mb-3 ${driver === 'with' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
-                  <p className="text-sm font-bold">بسائق</p>
-                  <p className="text-[9px] text-zinc-500 mt-1">مع سواق محترف</p>
+                  <p className="text-sm font-bold">{t.addAd.driverOptions.with}</p>
+                  <p className="text-[9px] text-zinc-500 mt-1">{t.addAd.driverOptions.withSub}</p>
                 </button>
                 <button type="button" onClick={() => { setDriver('without'); setStep(3); }}
                   className={`p-6 rounded-[2rem] border-2 transition-all text-center group ${
                     driver === 'without' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
                   <Car size={28} className={`mx-auto mb-3 ${driver === 'without' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
-                  <p className="text-sm font-bold">بدون سائق</p>
-                  <p className="text-[9px] text-zinc-500 mt-1">تسوق بنفسك</p>
+                  <p className="text-sm font-bold">{t.addAd.driverOptions.without}</p>
+                  <p className="text-[9px] text-zinc-500 mt-1">{t.addAd.driverOptions.withoutSub}</p>
                 </button>
                 <button type="button" onClick={() => { setDriver('both'); setStep(3); }}
                   className={`p-6 rounded-[2rem] border-2 transition-all text-center group ${
                     driver === 'both' ? 'border-[#c5a059] bg-[#c5a059]/10' : 'border-white/10 bg-white/5 hover:border-white/30'
                   }`}>
                   <User size={28} className={`mx-auto mb-3 ${driver === 'both' ? 'text-[#c5a059]' : 'text-zinc-400 group-hover:text-white'} transition-colors`} />
-                  <p className="text-sm font-bold">سائق وبدون سائق</p>
-                  <p className="text-[9px] text-zinc-500 mt-1">الخيارين متاحين</p>
+                  <p className="text-sm font-bold">{t.addAd.driverOptions.both}</p>
+                  <p className="text-[9px] text-zinc-500 mt-1">{t.addAd.driverOptions.bothSub}</p>
                 </button>
               </div>
             </div>
@@ -328,71 +345,80 @@ export default function AddAdPage() {
             <div className="space-y-8">
               <div className="text-center">
                 <p className="text-[9px] tracking-[5px] uppercase text-zinc-500 font-bold">
-                  Step {type === 'flowers' || type === 'trip' ? 2 : 4}
+                  {t.addAd.steps.details}
                 </p>
-                <h2 className="font-serif text-3xl italic mt-2">تفاصيل الإعلان</h2>
+                <h2 className="font-serif text-3xl italic mt-2">{t.addAd.steps.details}</h2>
               </div>
 
               {type === 'flowers' ? (
                 <div className="space-y-5">
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">اسم البوكيه</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.bouquetName}</label>
                     <input required value={bouquetName} onChange={e => setBouquetName(e.target.value)}
                       className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600"
-                      placeholder="مثلاً: بوكيه الورود الحمراء" />
+                      placeholder={t.addAd.fields.bouquetPlaceholder} />
+                  </div>
+                </div>
+              ) : type === 'package' ? (
+                <div className="space-y-5">
+                  <div className="bg-[#c5a059]/10 border border-[#c5a059]/20 rounded-2xl p-4 text-center">
+                    <p className="text-[#c5a059] text-[11px] font-bold">{t.addAd.fields.packageInfo}</p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.packageName}</label>
+                    <input required value={name} onChange={e => setName(e.target.value)}
+                      className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600"
+                      placeholder={t.addAd.fields.packagePlaceholder} />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.packageDetails}</label>
+                    <textarea required value={packageDetails} onChange={e => setPackageDetails(e.target.value)}
+                      className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600 h-40 resize-none font-mono text-[13px] leading-relaxed"
+                      placeholder={t.addAd.fields.packageDetailsPlaceholder} />
                   </div>
                 </div>
               ) : type === 'trip' ? (
                 <div className="space-y-5">
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">اسم المشوار</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.tripName}</label>
                     <input required value={name} onChange={e => setName(e.target.value)}
                       className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600"
-                      placeholder="مثلاً: مشوار مطار القاهرة" />
+                      placeholder={t.addAd.fields.tripPlaceholder} />
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">من</label>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.from}</label>
                       <input required value={fromLocation} onChange={e => setFromLocation(e.target.value)}
                         className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600"
-                        placeholder="شبين الكوم" />
+                        placeholder={t.addAd.fields.fromPlaceholder} />
                     </div>
                     <div>
-                      <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">إلى</label>
+                      <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.to}</label>
                       <input required value={toLocation} onChange={e => setToLocation(e.target.value)}
                         className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600"
-                        placeholder="مطار القاهرة" />
+                        placeholder={t.addAd.fields.toPlaceholder} />
                     </div>
                   </div>
                 </div>
               ) : (
                 <div className="space-y-5">
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">اسم العربية</label>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.carName}</label>
                     <input required value={name} onChange={e => setName(e.target.value)}
                       className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600"
-                      placeholder="مثلاً: BMW M4 LCI" />
+                      placeholder={t.addAd.fields.carPlaceholder} />
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">المدينة / المحافظة</label>
-                    <div className="flex flex-wrap gap-2">
-                      {LOCATIONS.map(loc => (
-                        <button key={loc} type="button" onClick={() => setLocation(loc)}
-                          className={`px-4 py-2 rounded-full text-[11px] font-bold transition-all border ${
-                            location === loc ? 'bg-[#c5a059] text-black border-[#c5a059]' : 'bg-white/10 text-white/60 border-white/10 hover:border-white/30'
-                          }`}>
-                          {loc}
-                        </button>
-                      ))}
-                    </div>
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.location}</label>
+                    <LocationPicker value={location} onChange={setLocation} />
                   </div>
                 </div>
               )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">السعر</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.price}</label>
                   <div className="relative">
                     <DollarSign size={16} className="absolute right-4 top-4 text-zinc-500" />
                     <input required value={price} onChange={e => setPrice(e.target.value)}
@@ -401,7 +427,7 @@ export default function AddAdPage() {
                   </div>
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">رقم الاتصال</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.phone}</label>
                   <div className="relative">
                     <Phone size={16} className="absolute right-4 top-4 text-zinc-500" />
                     <input required value={phone} onChange={e => setPhone(e.target.value)}
@@ -412,28 +438,28 @@ export default function AddAdPage() {
               </div>
 
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">واتساب (اختياري — لو مختلف عن رقم الاتصال)</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.whatsapp}</label>
                 <input value={whatsapp} onChange={e => setWhatsapp(e.target.value)}
                   className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600"
                   placeholder="010xxxxxxxx" />
               </div>
 
               <div>
-                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">الوصف</label>
+                <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.description}</label>
                 <textarea required value={description} onChange={e => setDescription(e.target.value)}
                   className="w-full bg-white/10 border border-white/10 p-4 rounded-2xl outline-none focus:border-[#c5a059] transition-all text-white placeholder:text-zinc-600 h-32 resize-none"
-                  placeholder="اكتب تفاصيل عن إعلانك..." />
+                  placeholder={t.addAd.fields.descriptionPlaceholder} />
               </div>
 
               {type === 'car' && (
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">الأيام المحجوزة</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.bookedDays}</label>
                   <CalendarPicker bookedDays={bookedDays} onToggle={handleToggleDay} />
                 </div>
               )}
 
                 <div>
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">الصور</label>
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.images}</label>
                   <input type="file" accept="image/*" multiple
                     onChange={async (e) => {
                       const files = Array.from(e.target.files || []);
@@ -447,8 +473,8 @@ export default function AddAdPage() {
                           });
                           setImages(prev => [...prev, url]);
                         } catch (err: unknown) {
-                          const msg = err instanceof Error ? err.message : 'خطأ غير معروف';
-                          alert(`فشل رفع ${files[i].name}: ${msg}`);
+                          const msg = err instanceof Error ? err.message : t.addAd.errors.generic;
+                          toast(`${t.addAd.fields.uploading} ${files[i].name}: ${msg}`, 'error');
                         }
                       }
                       setUploadProgress(null);
@@ -462,7 +488,7 @@ export default function AddAdPage() {
                       <div className="flex flex-col items-center gap-2 w-full max-w-xs">
                         <div className="flex items-center gap-2 text-zinc-400">
                           <div className="w-4 h-4 border-2 border-zinc-500 border-t-zinc-300 rounded-full animate-spin" />
-                          <span>رفع الصورة {uploadProgress.current} من {uploadProgress.total}</span>
+                          <span>{t.addAd.fields.uploading} {t.addAd.fields.imagesUploading} {uploadProgress.current} {t.addAd.fields.of} {uploadProgress.total}</span>
                         </div>
                         <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
                           <div className="h-full bg-[#c5a059] rounded-full transition-all duration-300"
@@ -471,14 +497,14 @@ export default function AddAdPage() {
                         <span className="text-zinc-500 text-[10px]">{uploadProgress.percent}%</span>
                       </div>
                     ) : (
-                      <><ImageIcon size={28} />{images.length > 0 ? `${images.length} صور مرفوعة` : 'اضغط لرفع الصور'}</>
+                      <><ImageIcon size={28} />{images.length > 0 ? `${images.length} ${t.addAd.fields.imagesCount}` : t.addAd.fields.imagesUpload}</>
                     )}
                   </label>
                 {images.length > 0 && (
                   <div className="flex flex-wrap gap-3 mt-4">
                     {images.map((url, i) => (
                       <div key={i} className="relative group">
-                        <img src={url} className="w-20 h-20 object-cover rounded-xl border border-white/10" />
+                        <img src={url} alt="Uploaded preview" className="w-20 h-20 object-cover rounded-xl border border-white/10" />
                         <button type="button" onClick={() => setImages(p => p.filter((_, idx) => idx !== i))}
                           className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 text-[10px] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">✕</button>
                       </div>
@@ -489,15 +515,15 @@ export default function AddAdPage() {
 
               <button type="submit" disabled={submitting}
                 className="w-full bg-[#c5a059] text-black py-5 rounded-[2rem] font-bold text-[12px] uppercase tracking-[0.3em] shadow-2xl hover:bg-[#d4af37] transition-all active:scale-[0.98] disabled:opacity-50">
-                {submitting ? 'جاري الإرسال...' : editMode ? 'حفظ التعديلات 💾' : 'إرسال الإعلان للمراجعة 📨'}
+                {submitting ? t.addAd.fields.submitting : editMode ? t.addAd.fields.save : t.addAd.fields.submit}
               </button>
 
               {type === 'car' && (
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-5 text-center">
                   <p className="text-[11px] text-zinc-400">
-                    <span className="text-[#c5a059] font-bold">{carType === 'wedding' ? '🎊 زفه' : '🚙 إيجار'}</span>
+                    <span className="text-[#c5a059] font-bold">{carType === 'wedding' ? t.addAd.carType.wedding : t.addAd.carType.rental}</span>
                     {' • '}
-                    <span className="text-[#c5a059] font-bold">{driver === 'with' ? '👤 بسائق' : driver === 'both' ? '👤 سائق وبدون سائق' : '🚗 بدون سائق'}</span>
+                    <span className="text-[#c5a059] font-bold">{driver === 'with' ? t.addAd.driverOptions.with : driver === 'both' ? t.addAd.driverOptions.both : t.addAd.driverOptions.without}</span>
                   </p>
                 </div>
               )}
@@ -506,5 +532,13 @@ export default function AddAdPage() {
         </form>
       </div>
     </main>
+  );
+}
+
+export default function AddAdPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white flex items-center justify-center"><div className="w-8 h-8 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" /></div>}>
+      <AddAdContent />
+    </Suspense>
   );
 }

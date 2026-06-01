@@ -5,10 +5,15 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'res.cloudinary.com', // السماح لموقع الصور الخارجي
+        hostname: 'res.cloudinary.com',
+      },
+      {
+        protocol: 'https',
+        hostname: '**.cloudinary.com',
       },
     ],
   },
+  allowedDevOrigins: ['*'],
 };
 
 export default nextConfig;

@@ -1,17 +1,23 @@
-// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
 import Image from 'next/image';
-import { useState, useEffect, useRef } from 'react';
-import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share2, Check, User, LogOut, Plus, Heart, Flower2 } from 'lucide-react';
+import { useState, useEffect, useRef, useMemo, useCallback, startTransition } from 'react';
+import { Phone, X, ChevronRight, ChevronLeft, MessageCircle, Star, Search, ZoomIn, Download, Share2, Check, User, LogOut, Plus, Heart, Bell } from 'lucide-react';
 import { db } from '@/lib/firebase';
 import { collection, getDocs, updateDoc, doc, increment, query, where, setDoc, deleteDoc, serverTimestamp, orderBy, limit, startAfter } from 'firebase/firestore';
 import { useAuth } from '@/lib/AuthContext';
+import { useLanguage } from '@/lib/LanguageContext';
 import Link from 'next/link';
 
 /* ─── Optimize Cloudinary image URL ─── */
 function optimizeImage(url: string, width: number): string {
   if (!url || !url.includes('res.cloudinary.com')) return url;
   return url.replace('/upload/', `/upload/f_auto,w_${width},q_auto/`);
+}
+
+/* ─── Format price ─── */
+function formatPrice(price: string | number): string {
+  return Number(price).toLocaleString('ar-EG');
 }
 
 /* ─── detect iOS / Android ─── */
@@ -27,7 +33,7 @@ function getOS(): 'ios' | 'android' | 'other' {
 async function shareCar(car: any) {
   const url   = `${window.location.origin}?car=${car.id}`;
   const title = `${car.name} — ZaFah Luxury Rental`;
-  const text  = `${car.name} متاحة للإيجار بسعر ${car.price} EGP / يوم 🚗`;
+  const text  = `${car.name} متاحة للإيجار بسعر ${formatPrice(car.price)} EGP / يوم 🚗`;
   if (navigator.share) {
     try { await navigator.share({ title, text, url }); } catch (_) {}
   } else {
@@ -37,6 +43,7 @@ async function shareCar(car: any) {
 
 /* ─── PWA Install Banner ─── */
 function InstallBanner({ onDismiss }: { onDismiss: () => void }) {
+  const { t } = useLanguage();
   const os = getOS();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
 
@@ -57,21 +64,17 @@ function InstallBanner({ onDismiss }: { onDismiss: () => void }) {
         <button onClick={onDismiss} className="absolute top-4 right-4 w-7 h-7 rounded-full bg-white/10 flex items-center justify-center group">
           <X size={13} className="text-white/60 group-hover:text-white transition-colors" />
         </button>
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-10 h-10 rounded-2xl bg-[#c5a059]/20 flex items-center justify-center">
-            <Share2 size={18} className="text-[#c5a059]" />
+          <div className="flex items-center gap-3 mb-4">
+            <div className="w-10 h-10 rounded-2xl bg-[#c5a059]/20 flex items-center justify-center">
+              <Share2 size={18} className="text-[#c5a059]" />
+            </div>
+            <div>
+              <p className="text-white text-sm font-bold">{t.installBanner.iosTitle}</p>
+              <p className="text-white/40 text-[10px] tracking-wider uppercase">{t.installBanner.iosSub}</p>
+            </div>
           </div>
-          <div>
-            <p className="text-white text-sm font-bold">أضف ZaFah لشاشتك</p>
-            <p className="text-white/40 text-[10px] tracking-wider uppercase">تجربة تطبيق كاملة</p>
-          </div>
-        </div>
-        <div className="space-y-2.5 text-right" dir="rtl">
-          {[
-            ['١', 'اضغط زرار', 'Share', 'في أسفل المتصفح'],
-            ['٢', 'اختار', '"Add to Home Screen"', ''],
-            ['٣', 'اضغط', '"Add"', 'وهيظهر زي أي تطبيق'],
-          ].map(([n, pre, gold, post]) => (
+          <div className="space-y-2.5 text-right" dir="rtl">
+            {t.installBanner.steps.map(([n, pre, gold, post]: string[]) => (
             <div key={n} className="flex items-center gap-3 bg-white/5 rounded-2xl px-4 py-3">
               <span className="text-white/40 text-[11px] font-bold">{n}</span>
               <p className="text-white/70 text-[12px]">{pre} <span className="text-[#c5a059] font-bold">{gold}</span> {post}</p>
@@ -89,11 +92,11 @@ function InstallBanner({ onDismiss }: { onDismiss: () => void }) {
           <Download size={18} className="text-[#c5a059]" />
         </div>
         <div className="flex-1 text-right" dir="rtl">
-          <p className="text-white text-sm font-bold">ثبّت تطبيق ZaFah</p>
-          <p className="text-white/50 text-[11px]">أسرع وشغّال حتى بدون نت</p>
+          <p className="text-white text-sm font-bold">{t.installBanner.androidTitle}</p>
+          <p className="text-white/50 text-[11px]">{t.installBanner.androidSub}</p>
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          <button onClick={handleAndroidInstall} className="bg-[#c5a059] text-black text-[10px] font-black uppercase tracking-wider px-4 py-2.5 rounded-2xl active:scale-95 transition-all">ثبّت</button>
+          <button onClick={handleAndroidInstall} className="bg-[#c5a059] text-black text-[10px] font-black uppercase tracking-wider px-4 py-2.5 rounded-2xl active:scale-95 transition-all">{t.installBanner.install}</button>
           <button onClick={onDismiss} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
             <X size={13} className="text-white/60" />
           </button>
@@ -197,9 +200,9 @@ export default function Home() {
   const [hasMore, setHasMore]           = useState(true);
   const [loadingMore, setLoadingMore]   = useState(false);
   const [searchQuery, setSearchQuery]   = useState("");
-  const [suggestions, setSuggestions]   = useState<any[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading]           = useState(true);
+  const [initialLoadDone, setInitialLoadDone] = useState(false);
   const [selectedCar, setSelectedCar]   = useState<any>(null);
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [scrollY, setScrollY]           = useState(0);
@@ -211,42 +214,48 @@ export default function Home() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [showSupport, setShowSupport] = useState(false);
 
-  const [activeFilter, setActiveFilter] = useState<'all' | 'wedding' | 'rental' | 'flowers' | 'trip' | 'favorites'>('all');
+  const [activeFilter, setActiveFilter] = useState<'all' | 'wedding' | 'rental' | 'flowers' | 'trip' | 'favorites' | 'package'>('all');
   const [driverFilter, setDriverFilter] = useState<'all' | 'with' | 'without'>('all');
-  const [favorites, setFavorites] = useState<string[]>([]);
+  const [favorites, setFavorites] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('zafah_favorites');
+        return stored ? JSON.parse(stored) : [];
+      } catch {}
+    }
+    return [];
+  });
+  const [mobileTab, setMobileTab] = useState<'home' | 'favorites' | 'more'>('home');
+  const [notifications, setNotifications] = useState<{ carId: string; carName: string; daysLeft: number; expiryDate: Date }[]>([]);
+  const [showNotifications, setShowNotifications] = useState(false);
 
   const { user, userProfile, loading: authLoading, isAdmin, signOut } = useAuth();
+  const { t, lang, dir, toggleLang } = useLanguage();
 
   /* ── Favorites management ── */
   useEffect(() => {
-    if (user) {
-      const migrateAndFetch = async () => {
-        try {
-          const localRaw = localStorage.getItem('zafah_favorites');
-          const localFavs = localRaw ? JSON.parse(localRaw) : [];
-          const q = query(collection(db, 'favorites'), where('userId', '==', user.uid));
-          const snap = await getDocs(q);
-          const firestoreFavs = snap.docs.map(d => d.data().carId);
-          const merged = [...new Set([...localFavs, ...firestoreFavs])];
-          setFavorites(merged);
-          const diff = localFavs.filter(id => !firestoreFavs.includes(id));
-          if (diff.length > 0) {
-            await Promise.all(diff.map(carId =>
-              setDoc(doc(db, 'favorites', `${user.uid}_${carId}`), {
-                userId: user.uid, carId, createdAt: serverTimestamp(),
-              })
-            ));
-          }
-          localStorage.removeItem('zafah_favorites');
-        } catch (err) { console.error('Favorites sync error:', err); }
-      };
-      migrateAndFetch();
-    } else {
+    if (!user) return;
+    const migrateAndFetch = async () => {
       try {
-        const stored = localStorage.getItem('zafah_favorites');
-        if (stored) setFavorites(JSON.parse(stored));
-      } catch {}
-    }
+        const localRaw = localStorage.getItem('zafah_favorites');
+        const localFavs = localRaw ? JSON.parse(localRaw) : [];
+        const q = query(collection(db, 'favorites'), where('userId', '==', user.uid));
+        const snap = await getDocs(q);
+        const firestoreFavs = snap.docs.map(d => d.data().carId);
+        const merged = [...new Set([...localFavs, ...firestoreFavs])];
+        startTransition(() => setFavorites(merged));
+        const diff = localFavs.filter((id: string) => !firestoreFavs.includes(id));
+        if (diff.length > 0) {
+          await Promise.all(diff.map((carId: string) =>
+            setDoc(doc(db, 'favorites', `${user.uid}_${carId}`), {
+              userId: user.uid, carId, createdAt: serverTimestamp(),
+            })
+          ));
+        }
+        localStorage.removeItem('zafah_favorites');
+      } catch (err) { console.error('Favorites sync error:', err); }
+    };
+    migrateAndFetch();
   }, [user]);
 
   const toggleFavorite = async (carId: string) => {
@@ -275,7 +284,7 @@ export default function Home() {
   const fleetRef  = useRef<HTMLDivElement>(null);
   const myWhatsAppNumber = "201095976766";
 
-  const displayCars = (cars || []).filter((car) => {
+  const displayCars = useMemo(() => (cars || []).filter((car) => {
     // Only show active (published) ads
     if (car.status && car.status !== 'active') return false;
 
@@ -289,7 +298,8 @@ export default function Home() {
     if (activeFilter === 'trip' && car.category !== 'trip') return false;
     if (activeFilter === 'wedding' && car.category !== 'car_wedding') return false;
     if (activeFilter === 'rental' && car.category !== 'car_rental') return false;
-    if (activeFilter === 'all' && (car.category === 'flowers' || car.bouquetName || car.category === 'trip')) return false;
+    if (activeFilter === 'package' && car.category !== 'car_package') return false;
+    // 'all' shows everything — no exclusion
 
     // Filter by driver (only for cars), 'both' matches either filter
     if (activeFilter !== 'flowers' && activeFilter !== 'trip' && driverFilter !== 'all') {
@@ -317,12 +327,18 @@ export default function Home() {
     return Object.entries(arabicBrands).some(
       ([ar, en]) => ar.includes(search) && carName.includes(en)
     );
-  });
+  }), [cars, activeFilter, driverFilter, favorites, searchQuery]);
 
-  /* ── scroll + outside-click ── */
+  /* ── scroll (throttled) + outside-click ── */
   useEffect(() => {
-    setMounted(true);
-    const onScroll  = () => setScrollY(window.scrollY);
+    startTransition(() => setMounted(true));
+    let ticking = false;
+    const onScroll = () => {
+      if (!ticking) {
+        requestAnimationFrame(() => { setScrollY(window.scrollY); ticking = false; });
+        ticking = true;
+      }
+    };
     const onOutside = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) setShowSuggestions(false);
     };
@@ -345,11 +361,43 @@ export default function Home() {
     }
   }, []);
 
+  /* ── Notification: check expiring ads ── */
+  useEffect(() => {
+    if (!user) return;
+    const checkExpiry = async () => {
+      try {
+        const q = query(
+          collection(db, "cars"),
+          where("status", "==", "active"),
+          where("userId", "==", user.uid)
+        );
+        const snap = await getDocs(q);
+        const now = Date.now();
+        const expiring: typeof notifications = [];
+        snap.forEach(d => {
+          const d2 = d.data();
+          if (d2.expiryDate) {
+            const exp = d2.expiryDate.toDate ? d2.expiryDate.toDate() : new Date(d2.expiryDate);
+            const days = Math.ceil((exp.getTime() - now) / (1000 * 60 * 60 * 24));
+            if (days >= 0 && days <= 3) {
+              expiring.push({ carId: d.id, carName: d2.name || '', daysLeft: days, expiryDate: exp });
+            }
+          }
+        });
+        setNotifications(expiring);
+      } catch {}
+    };
+    checkExpiry();
+    const interval = setInterval(checkExpiry, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [user]);
+
   const dismissBanner = () => { setShowInstallBanner(false); localStorage.setItem('pwa_banner_ts', String(Date.now())); };
 
   /* ── Pagination state ── */
   const lastDocRef = useRef<any>(null);
   const observerRef = useRef<HTMLDivElement>(null);
+  const mobileObserverRef = useRef<HTMLDivElement>(null);
   const PAGE_SIZE = 6;
 
   const sortFn = (a: any, b: any) => {
@@ -358,7 +406,7 @@ export default function Home() {
     return bVIP - aVIP;
   };
 
-  const fetchCars = async () => {
+  const fetchCars = useCallback(async () => {
     setLoading(true);
     // Show cached data immediately if available (stale-while-revalidate)
     try {
@@ -381,11 +429,12 @@ export default function Home() {
       lastDocRef.current = snap.docs[snap.docs.length - 1] || null;
       setHasMore(snap.docs.length === PAGE_SIZE);
       setLoading(false);
+      setInitialLoadDone(true);
       try { localStorage.setItem('luxe_cars_cache', JSON.stringify({ data, ts: Date.now() })); } catch (_) {}
-    } catch (err) { console.error("Firebase:", err); setLoading(false); }
-  };
+    } catch (err) { console.error("Firebase:", err); setLoading(false); setInitialLoadDone(true); }
+  }, []);
 
-  const loadMore = async () => {
+  const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore || !lastDocRef.current) return;
     setLoadingMore(true);
     try {
@@ -404,31 +453,54 @@ export default function Home() {
       setHasMore(snap.docs.length === PAGE_SIZE);
     } catch (err) { console.error("loadMore error:", err); }
     finally { setLoadingMore(false); }
-  };
+  }, [loadingMore, hasMore]);
 
   useEffect(() => {
-    fetchCars();
-  }, []);
+    startTransition(() => {
+      fetchCars();
+    });
+  }, [fetchCars]);
 
   /* ── IntersectionObserver for infinite scroll ── */
   useEffect(() => {
-    if (!observerRef.current) return;
+    const target = observerRef.current;
+    if (!target) return;
     const observer = new IntersectionObserver((entries) => {
       if (entries[0].isIntersecting && hasMore && !loadingMore) {
         loadMore();
       }
     }, { rootMargin: '200px' });
-    observer.observe(observerRef.current);
+    observer.observe(target);
     return () => observer.disconnect();
-  }, [hasMore, loadingMore, cars]);
+  }, [hasMore, loadingMore, loadMore]);
+
+  useEffect(() => {
+    const target = mobileObserverRef.current;
+    if (!target) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries[0].isIntersecting && hasMore && !loadingMore) {
+        loadMore();
+      }
+    }, { rootMargin: '200px' });
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, loadingMore, loadMore]);
 
   /* ── search suggestions ── */
+  const [suggestions, setSuggestions] = useState<any[]>([]);
   useEffect(() => {
     if (searchQuery.length > 0) {
-      const f = displayCars.slice(0, 5);
-      setSuggestions(f); setShowSuggestions(true);
-    } else { setSuggestions([]); setShowSuggestions(false); }
-  }, [searchQuery, activeFilter, driverFilter, favorites, cars]);
+      startTransition(() => {
+        setSuggestions(displayCars.slice(0, 5));
+        setShowSuggestions(true);
+      });
+    } else {
+      startTransition(() => {
+        setSuggestions([]);
+        setShowSuggestions(false);
+      });
+    }
+  }, [searchQuery, displayCars]);
 
   const handleSelectCar = (car: any) => {
     const images = Array.isArray(car.image) ? car.image : car.image ? [car.image] : ['/placeholder-car.png'];
@@ -469,20 +541,19 @@ export default function Home() {
       {showInstallBanner && <InstallBanner onDismiss={dismissBanner} />}
 
       {/* ════ NAV ════ */}
-      <nav className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a] text-white px-6 md:px-12 py-5 flex justify-between items-center border-b border-white/5 shadow-2xl">
+      <nav className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a] text-white px-6 md:px-12 py-5 hidden md:flex justify-between items-center border-b border-white/5 shadow-2xl">
         <div className="flex-1 flex flex-col items-start cursor-default group">
           <div className="relative">
             <span className="font-serif text-2xl font-bold text-white tracking-tight transition-all duration-700 group-hover:text-[#c5a059]">ZaFah</span>
             <div className="absolute -bottom-1 left-0 h-[1px] w-0 bg-[#c5a059] transition-all duration-700 group-hover:w-full" />
           </div>
-          <span className="text-[7px] tracking-[0.7em] text-zinc-500 uppercase mt-1.5">Luxury Rental</span>
         </div>
 
         <div ref={searchRef} className="flex-[1.5] max-w-sm hidden md:flex flex-col relative mx-4">
           <div className="relative flex items-center w-full">
             <Search size={14} className="absolute left-4 text-zinc-400" />
             <input
-              type="text" placeholder="Search fleet..."
+              type="text" placeholder={t.nav.search}
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               onFocus={() => searchQuery.length > 0 && setShowSuggestions(true)}
@@ -497,7 +568,7 @@ export default function Home() {
                   className="px-5 py-3 hover:bg-zinc-50 cursor-pointer flex justify-between items-center border-b border-zinc-50 last:border-none"
                 >
                   <span className="text-[11px] font-medium">{car.name}</span>
-                  <span className="text-[9px] opacity-40 uppercase tracking-widest">{car.price} EGP</span>
+                   <span className="text-[9px] opacity-40 uppercase tracking-widest">{formatPrice(car.price)} {t.carCard.egp}</span>
                 </div>
               ))}
             </div>
@@ -509,7 +580,7 @@ export default function Home() {
             <button
               onClick={() => setShowSupport(!showSupport)}
               className="w-10 h-10 rounded-full bg-black border border-white/20 flex items-center justify-center hover:bg-zinc-800 transition-all shadow-lg active:scale-90"
-              title="الدعم الفني"
+              title={t.nav.support}
             >
               <Phone size={15} className="text-white" />
             </button>
@@ -518,32 +589,40 @@ export default function Home() {
                 <div className="w-12 h-12 rounded-full bg-[#c5a059]/20 flex items-center justify-center mx-auto mb-3">
                   <Phone size={20} className="text-[#c5a059]" />
                 </div>
-                <p className="text-white text-sm font-bold">الدعم الفني</p>
-                <p className="text-zinc-400 text-[10px] mt-1">تواصل معنا واتساب</p>
+                <p className="text-white text-sm font-bold">{t.nav.support}</p>
                 <a
                   href={`https://wa.me/${myWhatsAppNumber}`}
                   target="_blank"
                   className="mt-4 inline-flex items-center gap-2 bg-[#25D366] text-white px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-[2px] hover:bg-[#20bd5a] transition-all active:scale-95"
                 >
                   <MessageCircle size={14} />
-                  واتساب
+                  {t.nav.whatsapp}
                 </a>
                 <a
                   href={`tel:+${myWhatsAppNumber}`}
                   className="mt-2 inline-flex items-center gap-2 bg-white/10 text-white px-6 py-3 rounded-full text-[10px] font-bold uppercase tracking-[2px] hover:bg-white/20 transition-all active:scale-95 w-full justify-center"
                 >
                   <Phone size={14} />
-                  اتصال
+                  {t.nav.call}
                 </a>
                 <button
                   onClick={() => setShowSupport(false)}
-                  className="mt-3 text-[9px] text-zinc-600 hover:text-zinc-400 transition-all"
+                  className="mt-3 text-[9px] text-zinc-400 hover:text-zinc-300 transition-all"
                 >
-                  إغلاق
+                  {t.nav.close}
                 </button>
               </div>
             )}
           </div>
+
+          {/* Language Toggle - Desktop */}
+          <button
+            onClick={toggleLang}
+            className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all text-[11px] font-bold tracking-widest"
+            title={lang === 'ar' ? 'العربية (اضغط للتغيير)' : 'English (click to change)'}
+          >
+            {lang === 'ar' ? 'AR' : 'EN'}
+          </button>
 
           {!authLoading && (
             user && userProfile ? (
@@ -564,16 +643,16 @@ export default function Home() {
                   <div className="absolute top-full right-0 mt-2 w-52 bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[200]">
                     <Link href="/add-ad" className="flex items-center gap-3 px-5 py-3.5 hover:bg-white/5 transition-all text-[11px] border-b border-white/5">
                       <Plus size={14} className="text-green-400" />
-                      إضافة إعلان
+                      {t.nav.addListing}
                     </Link>
                     <Link href="/my-ads" className="flex items-center gap-3 px-5 py-3.5 hover:bg-white/5 transition-all text-[11px] border-b border-white/5">
                       <Heart size={14} className="text-white/50" />
-                      إعلاناتي
+                      {t.nav.myAds}
                     </Link>
                     {isAdmin && (
                       <Link href="/admin" className="flex items-center gap-3 px-5 py-3.5 hover:bg-white/5 transition-all text-[11px] border-b border-white/5">
                         <Star size={14} className="text-[#c5a059]" />
-                        Admin Panel
+                        {t.nav.adminPanel}
                       </Link>
                     )}
                     <button
@@ -581,7 +660,7 @@ export default function Home() {
                       className="w-full flex items-center gap-3 px-5 py-3.5 hover:bg-white/5 transition-all text-[11px] text-red-400"
                     >
                       <LogOut size={14} />
-                      تسجيل خروج
+                      {t.nav.logout}
                     </button>
                   </div>
                 )}
@@ -592,7 +671,7 @@ export default function Home() {
                   className="flex items-center gap-2 bg-[#c5a059]/10 border border-[#c5a059]/30 px-4 py-2.5 rounded-full hover:bg-[#c5a059]/20 transition-all group"
                 >
                   <User size={13} className="text-[#c5a059]" />
-                  <span className="text-[9px] font-bold tracking-[2px] uppercase text-[#c5a059]">Sign In</span>
+                  <span className="text-[9px] font-bold tracking-[2px] uppercase text-[#c5a059]">{t.nav.signIn}</span>
                 </Link>
             )
           )}
@@ -600,7 +679,7 @@ export default function Home() {
       </nav>
 
       {/* ════ CONTENT ════ */}
-      <div className="relative z-10">
+      <div className="relative z-10 hidden md:block">
         <header className="px-6 md:px-10 pt-44 md:pt-56 pb-24 max-w-7xl mx-auto transition-opacity duration-500" style={{ opacity: headerOpacity }}>
           <h1 className="font-serif text-7xl md:text-[10rem] font-light leading-[0.8] tracking-tighter text-white drop-shadow-2xl">
             Elite <br />
@@ -620,12 +699,13 @@ export default function Home() {
           {/* ── Filter Bar ── */}
           <div className="flex flex-wrap gap-3 mb-10 justify-center">
             {[
-              { key: 'trip', label: '🗺️ Trips', icon: null, gold: true },
-              { key: 'all', label: '🚗 cars', icon: null },
-              { key: 'wedding', label: '🎊 zafah', icon: null },
-              { key: 'rental', label: '🚙 Rental', icon: null },
-              { key: 'flowers', label: '💐 Flowers', icon: null },
-              { key: 'favorites', label: `❤️ Favorite (${cars.filter(c => favorites.includes(c.id)).length})`, icon: null },
+              { key: 'trip', label: t.filters.trips, icon: null, gold: true },
+              { key: 'all', label: t.filters.cars, icon: null },
+              { key: 'wedding', label: t.filters.wedding, icon: null },
+              { key: 'rental', label: t.filters.rental, icon: null },
+              { key: 'package', label: t.filters.package, icon: null, gold: true },
+              { key: 'flowers', label: t.filters.flowers, icon: null },
+              { key: 'favorites', label: `❤️ ${t.filters.favorites} (${cars.filter(c => favorites.includes(c.id)).length})`, icon: null },
             ].map(f => (
               <button key={f.key} onClick={() => setActiveFilter(f.key as any)}
                 className={`px-5 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-[2px] transition-all border ${
@@ -644,9 +724,9 @@ export default function Home() {
           {(activeFilter === 'wedding' || activeFilter === 'rental') && (
             <div className="flex flex-wrap gap-3 mb-10 justify-center">
               {[
-                { key: 'all', label: 'الكل' },
-                { key: 'with', label: '👤 بسائق' },
-                { key: 'without', label: '🚗 بدون سائق' },
+                { key: 'all', label: t.driver.all },
+                { key: 'with', label: t.driver.with },
+                { key: 'without', label: t.driver.without },
               ].map(f => (
                 <button key={f.key} onClick={() => setDriverFilter(f.key as any)}
                   className={`px-4 py-2 rounded-full text-[9px] font-bold uppercase tracking-[2px] transition-all border ${
@@ -660,7 +740,7 @@ export default function Home() {
             </div>
           )}
 
-          {(loading || (cars.length === 0 && !searchQuery)) ? (
+          {(loading || (!initialLoadDone && cars.length === 0 && !searchQuery)) ? (
             activeFilter === 'trip' ? (
               <div className="space-y-4 md:space-y-6">
                 {[1,2,3,4].map(i => (
@@ -725,7 +805,7 @@ export default function Home() {
                 {loadingMore ? (
                   <div className="flex items-center gap-3 text-white/40">
                     <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-                    <span className="text-[10px] uppercase tracking-[3px]">Loading more...</span>
+                    <span className="text-[10px] uppercase tracking-[3px]">{t.common.loading}</span>
                   </div>
                 ) : (
                   <div className="w-6 h-6" />
@@ -734,7 +814,10 @@ export default function Home() {
             )}
             </>
           ) : (
-            <p className="py-20 text-center text-white/40 font-serif italic">No vehicles matching your search found.</p>
+            <div className="py-20 text-center">
+              <Search size={48} className="mx-auto text-white/30 mb-4" />
+              <p className="text-white/40 font-serif italic">{t.common.noResults}</p>
+            </div>
           )}
         </section>
       </div>
@@ -760,13 +843,24 @@ export default function Home() {
             </button>
 
             {/* ── Image panel ── */}
-            <div className="relative bg-zinc-900 flex-shrink-0 h-[48vw] min-h-[200px] max-h-[280px] md:h-auto md:w-3/5 md:max-h-[88vh]">
+            <div className="relative bg-zinc-900 flex-shrink-0 h-[48vw] min-h-[200px] max-h-[280px] md:h-auto md:w-3/5 md:max-h-[88vh]"
+              onTouchStart={e => { (window as any)._touchStartX = e.touches[0].clientX; }}
+              onTouchEnd={e => {
+                const diff = (window as any)._touchStartX - e.changedTouches[0].clientX;
+                if (Math.abs(diff) > 50) {
+                  if (diff > 0) setCurrentImageIndex(p => (p + 1) % selectedCar.images.length);
+                  else setCurrentImageIndex(p => (p - 1 + selectedCar.images.length) % selectedCar.images.length);
+                }
+                delete (window as any)._touchStartX;
+              }}>
               <Image
                 src={optimizeImage(selectedCar.images[currentImageIndex], 800)}
                 alt={selectedCar.name}
                 fill
+                unoptimized
                 sizes="(max-width: 768px) 100vw, 60vw"
-                className="object-cover cursor-zoom-in transition-opacity duration-500"
+                className="object-cover cursor-zoom-in transition-opacity duration-500 select-none"
+                draggable={false}
                 onClick={() => setZoomedImage(selectedCar.images[currentImageIndex])}
               />
               <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm text-white rounded-full px-3 py-1 flex items-center gap-1.5 pointer-events-none">
@@ -802,28 +896,25 @@ export default function Home() {
               {/* ── Car name + Share button ── */}
               <div className="mb-1 pr-12 md:pr-0">
                 {/* اسم العربية */}
-                <h2
-                  className="font-serif text-3xl md:text-5xl font-semibold italic text-black leading-tight"
-                  style={{ fontFamily: "'Playfair Display',Georgia,serif" }}
-                >
+                <h2 className="text-3xl md:text-5xl font-black text-black leading-tight tracking-tight">
                   {selectedCar.name}
                 </h2>
                 <p className="text-[9px] text-zinc-400 uppercase tracking-[4px] mt-2 font-bold">
-                  {selectedCar.category === 'trip' ? 'Trip Service' : 'Premium Class'}
+                  {selectedCar.category === 'trip' ? t.detail.tripService : t.detail.premiumClass}
                 </p>
 
                 {/* ── Share button — تحت الاسم مباشرة ── */}
                 <button
                   onClick={handleShare}
                   className="mt-4 flex items-center gap-2 bg-black text-white pl-4 pr-5 py-2.5 rounded-full shadow-md hover:bg-zinc-800 active:scale-95 transition-all duration-300 group"
-                  title="Share"
+                  title={t.detail.shareTooltip}
                 >
                   {copied
                     ? <Check size={14} className="text-green-400" />
                     : <Share2 size={14} className="text-white" />
                   }
                   <span className="text-[10px] font-bold uppercase tracking-[2px]">
-                    {copied ? 'تم النسخ!' : 'Share'}
+                    {copied ? t.detail.copied : t.detail.share}
                   </span>
                 </button>
               </div>
@@ -841,14 +932,14 @@ export default function Home() {
                   <div className="flex items-center gap-4 justify-center">
                     {selectedCar.fromLocation && (
                       <div className="text-center">
-                        <p className="text-[8px] text-zinc-400 uppercase tracking-widest font-bold">من</p>
+                        <p className="text-[8px] text-zinc-400 uppercase tracking-widest font-bold">{t.detail.from}</p>
                         <p className="text-lg font-bold text-black mt-1">{selectedCar.fromLocation}</p>
                       </div>
                     )}
                     <div className="text-zinc-300 text-2xl">→</div>
                     {selectedCar.toLocation && (
                       <div className="text-center">
-                        <p className="text-[8px] text-zinc-400 uppercase tracking-widest font-bold">إلى</p>
+                        <p className="text-[8px] text-zinc-400 uppercase tracking-widest font-bold">{t.detail.to}</p>
                         <p className="text-lg font-bold text-black mt-1">{selectedCar.toLocation}</p>
                       </div>
                     )}
@@ -856,15 +947,34 @@ export default function Home() {
                 </div>
               )}
 
+              {/* ── Package Details ── */}
+              {selectedCar.category === 'car_package' && selectedCar.packageDetails && (
+                <div className="mt-5 bg-white rounded-[1.2rem] border border-zinc-200 shadow-sm p-5">
+                  <p className="text-[8px] font-black uppercase tracking-[5px] text-center text-zinc-400 mb-3">
+                    {t.detail.packageIncludes}
+                  </p>
+                  <div className="space-y-2" dir="rtl">
+                    {selectedCar.packageDetails.split('\n').filter((l: string) => l.trim()).map((line: string, i: number) => (
+                      <div key={i} className="flex items-center gap-3 bg-zinc-50 rounded-xl px-4 py-3">
+                        <div className="w-6 h-6 rounded-full bg-[#c5a059]/20 flex items-center justify-center shrink-0">
+                          <span className="text-[10px] font-black text-[#c5a059]">{i + 1}</span>
+                        </div>
+                        <p className="text-[13px] font-medium text-zinc-700">{line}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* ── Smart Calendar ── */}
-              {selectedCar.category !== 'trip' && (() => {
+              {selectedCar.category !== 'trip' && selectedCar.category !== 'car_package' && (() => {
                 const now        = new Date();
                 const year       = now.getFullYear();
                 const month      = now.getMonth(); // 0-indexed
                 const today      = now.getDate();
                 const firstDay   = new Date(year, month, 1).getDay(); // 0=Sun
                 const daysInMonth = new Date(year, month + 1, 0).getDate();
-                const monthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+                const monthNames = t.calendar.monthNames;
 
                 // خلايا فاضية قبل أول يوم في الشهر
                 const blanks = Array.from({ length: firstDay });
@@ -874,19 +984,19 @@ export default function Home() {
                   <div className="mt-5 bg-white rounded-[1.2rem] border border-zinc-200 shadow-sm p-4 md:p-6">
                     {/* Header */}
                     <p className="text-[8px] font-black uppercase tracking-[5px] text-center text-zinc-400 mb-1">
-                      Availability Schedule
+                      {t.detail.availability}
                     </p>
                     {/* Month + Year */}
                     <p className="text-[13px] font-extrabold text-center text-black mb-1">
                       {monthNames[month]} {year}
                     </p>
-                    <p className="text-[11px] text-center text-red-500 font-bold mb-4" dir="rtl">
-                      🔴 الأيام الحمراء محجوزة مسبقاً
+                    <p className="text-[11px] text-center text-red-500 font-bold mb-4">
+                      {t.detail.bookedDays}
                     </p>
 
                     {/* Day headers */}
                     <div className="grid grid-cols-7 gap-1 mb-2">
-                      {['Su','Mo','Tu','We','Th','Fr','Sa'].map(d => (
+                      {[t.calendar.su, t.calendar.mo, t.calendar.tu, t.calendar.we, t.calendar.th, t.calendar.fr, t.calendar.sa].map(d => (
                         <div key={d} className="text-[7px] font-black uppercase text-zinc-300 text-center">{d}</div>
                       ))}
                     </div>
@@ -922,14 +1032,14 @@ export default function Home() {
               })()}
 
               {/* CTA */}
-              <div className="mt-5 flex gap-3">
-                <a href={`https://wa.me/${selectedCar.whatsapp || selectedCar.phone || myWhatsAppNumber}?text=${encodeURIComponent("مرحباً، أنا مهتم بـ " + selectedCar.name)}`} target="_blank"
+              <div className="mt-5 flex gap-3 md:relative md:mt-5 md:bg-transparent md:p-0 sticky bottom-0 bg-[#F5F4F1] pt-4 pb-3 -mx-5 px-5 md:mx-0 md:px-0 md:pt-0 md:pb-0 md:sticky-none">
+                <a href={`https://wa.me/${selectedCar.whatsapp || selectedCar.phone || myWhatsAppNumber}?text=${encodeURIComponent(t.chat.inquiry + selectedCar.name)}`} target="_blank"
                   className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] text-white py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[2px] shadow-lg active:scale-95 transition-all">
-                  <MessageCircle size={16} /> WhatsApp
+                  <MessageCircle size={16} /> {t.detail.whatsapp}
                 </a>
                 <a href={`tel:+${selectedCar.phone || selectedCar.whatsapp || myWhatsAppNumber}`}
                   className="flex-1 flex items-center justify-center gap-2 bg-black text-white py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[2px] shadow-lg active:scale-95 transition-all">
-                  <Phone size={16} /> Call
+                  <Phone size={16} /> {t.detail.call}
                 </a>
               </div>
             </div>
@@ -941,13 +1051,14 @@ export default function Home() {
       {/* ════ ZOOM LIGHTBOX ════ */}
       {zoomedImage && (
         <div className="fixed inset-0 z-[300] bg-black/95 flex items-center justify-center p-4 cursor-zoom-out" onClick={() => setZoomedImage(null)}>
-          <Image src={zoomedImage} alt="Zoomed"
+          <Image src={optimizeImage(zoomedImage, 1200)} alt="Zoomed"
             fill
+            unoptimized
             className="object-contain rounded-2xl shadow-2xl select-none"
             style={{ animation: 'zoomIn 0.25s ease-out' }}
             onClick={e => e.stopPropagation()}
           />
-          <p className="absolute bottom-6 text-white/40 text-[10px] tracking-[4px] uppercase">اضغط خارج الصورة للإغلاق</p>
+          <p className="absolute bottom-6 text-white/40 text-[10px] tracking-[4px] uppercase">{t.detail.closeZoom}</p>
         </div>
       )}
       {zoomedImage && (
@@ -956,17 +1067,537 @@ export default function Home() {
         </button>
       )}
 
+      {/* ════ MOBILE LAYOUT ════ */}
+      <div className="block md:hidden relative z-10">
+        {/* Mobile Header */}
+        <div className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a]/95 backdrop-blur-xl border-b border-white/10 px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="font-serif text-lg font-bold text-white tracking-tight">ZaFah</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <button onClick={() => setShowNotifications(!showNotifications)}
+                className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center active:scale-90 transition-all relative">
+                <Bell size={14} className="text-white/70" />
+                {notifications.length > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-4 h-4 rounded-full bg-red-500 text-white text-[7px] font-bold flex items-center justify-center shadow-lg shadow-red-500/30">
+                    {notifications.length}
+                  </span>
+                )}
+              </button>
+              {showNotifications && (
+                <div className="fixed top-14 left-4 right-4 z-[200] bg-[#0a0a0a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="p-4 border-b border-white/10">
+                    <p className="text-white text-sm font-bold">الإشعارات</p>
+                  </div>
+                  {notifications.length > 0 ? (
+                    <div className="max-h-64 overflow-y-auto">
+                      {notifications.map(n => (
+                        <a key={n.carId}
+                          href={`https://wa.me/${myWhatsAppNumber}?text=${encodeURIComponent('مرحباً، أريد تجديد إعلان ' + n.carName)}`}
+                          target="_blank"
+                          className="flex items-center gap-3 px-4 py-3.5 hover:bg-white/5 transition-all border-b border-white/5 last:border-none"
+                          onClick={() => setShowNotifications(false)}>
+                          <div className="w-8 h-8 rounded-full bg-yellow-500/20 flex items-center justify-center shrink-0">
+                            <Bell size={13} className="text-yellow-400" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white text-[12px] font-bold truncate">{n.carName}</p>
+                            <p className="text-yellow-400/80 text-[9px]">{n.daysLeft === 0 ? 'ينتهي اليوم!' : `متبقي ${n.daysLeft} أيام`}</p>
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="p-6 text-center">
+                      <p className="text-zinc-500 text-[12px]">لا توجد إشعارات</p>
+                    </div>
+                  )}
+                  <button onClick={() => setShowNotifications(false)}
+                    className="w-full py-3 text-[10px] text-zinc-600 hover:text-zinc-400 transition-all border-t border-white/5">
+                    إغلاق
+                  </button>
+                </div>
+              )}
+            </div>
+            {!authLoading && (
+              user && userProfile ? (
+                <button onClick={() => setMobileTab('more')}
+                  className="w-9 h-9 rounded-full bg-[#c5a059]/20 flex items-center justify-center">
+                  <User size={14} className="text-[#c5a059]" />
+                </button>
+              ) : (
+                <Link href="/login"
+                  className="w-9 h-9 rounded-full bg-[#c5a059]/10 border border-[#c5a059]/30 flex items-center justify-center">
+                  <User size={14} className="text-[#c5a059]" />
+                </Link>
+              )
+            )}
+          </div>
+        </div>
+
+        <div className="pt-20">
+
+        {/* Mobile Content */}
+        <div className="pb-20 min-h-screen">
+          {/* Mobile Hero — Arabic always, fades on scroll */}
+          <div className="px-4 pt-4 pb-1 text-center transition-opacity duration-500" style={{ opacity: Math.max(0, 1 - scrollY / 400) }}>
+            <p className="text-white/90 text-sm leading-relaxed" style={{ fontFamily: "'Playfair Display','Noto Naskh Arabic',Georgia,serif" }}>
+              نقدم تجربة استثنائية تتجاوز مجرد استئجار سيارة؛
+              <br />
+              <span className="font-semibold italic">نصمم لحظات تليق بك وبتفاصيلك الخاصة.</span>
+            </p>
+          </div>
+          {/* Mobile Search */}
+          <div className="px-4 pt-3 pb-2">
+            <div className="relative flex items-center w-full">
+              <Search size={14} className="absolute right-4 text-zinc-500" />
+              <input
+                type="text" placeholder={t.nav.searchPlaceholder}
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+                className="w-full bg-white/10 border border-white/20 py-3 pr-11 pl-4 rounded-2xl text-[12px] outline-none text-white placeholder:text-zinc-600"
+              />
+            </div>
+          </div>
+
+          {/* Mobile Tab Content */}
+          {mobileTab === 'home' && (
+            <div className="px-4 pb-6">
+              {/* Category chips - horizontal scroll */}
+              <div className="flex gap-2 overflow-x-auto pb-3 scrollbar-none" style={{ WebkitOverflowScrolling: 'touch' }}>
+                {[
+                  { key: 'all', label: t.filters.all },
+                  { key: 'wedding', label: t.filters.wedding },
+                  { key: 'rental', label: t.filters.rental },
+                  { key: 'package', label: t.filters.package },
+                  { key: 'flowers', label: t.filters.flowers },
+                  { key: 'trip', label: t.filters.trips },
+                  { key: 'favorites', label: `❤️ ${t.filters.favorites} (${cars.filter(c => favorites.includes(c.id)).length})` },
+                ].map(f => (
+                  <button key={f.key} onClick={() => setActiveFilter(f.key as any)}
+                    className={`whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-bold transition-all border shrink-0 ${
+                      activeFilter === f.key
+                        ? 'bg-[#c5a059] text-black border-[#c5a059]'
+                        : 'bg-white/10 text-white/60 border-white/10'
+                    }`}>
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Driver sub-filter */}
+              {(activeFilter === 'wedding' || activeFilter === 'rental') && (
+                <div className="flex gap-2 overflow-x-auto pb-3" style={{ WebkitOverflowScrolling: 'touch' }}>
+                  {[
+                    { key: 'all', label: t.driver.all },
+                    { key: 'with', label: t.driver.with },
+                    { key: 'without', label: t.driver.without },
+                  ].map(f => (
+                    <button key={f.key} onClick={() => setDriverFilter(f.key as any)}
+                      className={`whitespace-nowrap px-3 py-1.5 rounded-full text-[9px] font-bold transition-all border shrink-0 ${
+                        driverFilter === f.key
+                          ? 'bg-white/20 text-white border-white/30'
+                          : 'bg-transparent text-white/40 border-white/10'
+                      }`}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Loading state */}
+              {loading ? (
+                activeFilter === 'all' ? (
+                <div className="flex gap-4 overflow-x-auto pb-4 pt-2 px-4 -mx-4 snap-x snap-mandatory scrollbar-none">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="w-[68vw] shrink-0 rounded-2xl overflow-hidden border border-white/10 bg-white/10 shimmer snap-center animate-pulse">
+                      <div className="h-36 bg-white/5" />
+                      <div className="p-4 space-y-2 bg-black/40">
+                        <div className="h-3 w-16 bg-white/10 rounded-full" />
+                        <div className="h-4 w-24 bg-white/10 rounded-full" />
+                        <div className="h-3 w-20 bg-white/10 rounded-full" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                ) : (
+                <div className="grid grid-cols-2 gap-3 pb-4 pt-2 px-4 -mx-4">
+                  {[1,2,3,4].map(i => (
+                    <div key={i} className="rounded-xl overflow-hidden border border-white/10 bg-white/10 shimmer animate-pulse">
+                      <div className="aspect-square bg-white/5" />
+                      <div className="p-3 space-y-2">
+                        <div className="h-2 w-12 bg-white/10 rounded-full" />
+                        <div className="h-3 w-20 bg-white/10 rounded-full" />
+                        <div className="h-3 w-16 bg-white/10 rounded-full" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                )
+              ) : displayCars.length > 0 ? (
+                activeFilter === 'all' ? (
+                (() => {
+                  const packages = displayCars.filter(c => c.category === 'car_package');
+                  const weddingCars = displayCars.filter(c => c.category === 'car_wedding');
+                  const rentalCars = displayCars.filter(c => c.category === 'car_rental');
+                  const flowers = displayCars.filter(c => c.category === 'flowers' || c.bouquetName);
+                  const trips = displayCars.filter(c => c.category === 'trip');
+                  const sections = [
+                    { key: 'car_package', items: packages, label: t.filters.package, simple: false },
+                    { key: 'car_wedding', items: weddingCars, label: t.filters.wedding, simple: false },
+                    { key: 'car_rental', items: rentalCars, label: t.filters.rental, simple: false },
+                    { key: 'flowers', items: flowers, label: t.filters.flowers, simple: true },
+                    { key: 'trip', items: trips, label: t.filters.trips, simple: true },
+                  ];
+                  return (
+                    <div className="space-y-5 pb-4">
+                      {sections.map(s => s.items.length > 0 && (
+                        <div key={s.key}>
+                          <h3 className="text-white/70 text-[11px] font-bold uppercase tracking-[3px] px-4 mb-2">
+                            {dir === 'rtl' ? (
+                              <>{s.label} — <span className="text-white/40">{s.items.length}</span></>
+                            ) : (
+                              <><span className="text-white/40">{s.items.length}</span> — {s.label}</>
+                            )}
+                          </h3>
+                          <div className="flex gap-3 overflow-x-auto pb-2 px-4 -mx-4 scrollbar-none" style={{ WebkitOverflowScrolling: 'touch' }}>
+                            {s.items.map(car => (
+                              <div key={car.id} onClick={() => handleSelectCar(car)}
+                                className="relative w-[60vw] shrink-0 rounded-xl overflow-hidden border border-white/20 bg-white/10 active:scale-[0.97] transition-all">
+                                <div className="relative h-32 w-full">
+                                  <Image
+                                    src={optimizeImage(Array.isArray(car.image) ? car.image[0] : car.image, 400)}
+                                    alt={car.name}
+                                    fill unoptimized className="object-cover"
+                                  />
+                                </div>
+                                <div className="p-2.5">
+                                  {s.simple ? (
+                                    <>
+                                      <h3 className="text-sm font-bold text-white leading-tight truncate">{car.bouquetName || car.name}</h3>
+                                      {car.description && <p className="text-[9px] text-white/50 mt-0.5 line-clamp-2">{car.description}</p>}
+                                      <div className="flex items-center justify-between mt-2">
+                                        <p className="text-sm font-extrabold text-white">{formatPrice(car.price)} <span className="text-[7px] text-zinc-400">{t.carCard.egp}</span></p>
+                                        <div className="flex gap-1">
+                                          <a href={`https://wa.me/${car.whatsapp || car.phone || myWhatsAppNumber}?text=${encodeURIComponent(t.chat.inquiry + (car.bouquetName || car.name))}`}
+                                            onClick={e => e.stopPropagation()}
+                                            className="bg-[#25D366] p-1.5 rounded-full">
+                                            <MessageCircle size={10} className="text-white" />
+                                          </a>
+                                          <a href={`tel:+${car.phone || car.whatsapp || myWhatsAppNumber}`}
+                                            onClick={e => e.stopPropagation()}
+                                            className="bg-white/20 p-1.5 rounded-full">
+                                            <Phone size={10} className="text-white" />
+                                          </a>
+                                        </div>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <p className="text-[8px] text-zinc-400 font-bold uppercase tracking-wider">
+                                        {car.driver && car.driver !== 'both' ? (car.driver === 'with' ? t.driver.with : t.driver.without) : ''}
+                                      </p>
+                                      <h3 className="text-sm font-bold text-white leading-tight truncate">{car.name}</h3>
+                                      <div className="flex items-center justify-between mt-2">
+                                        <p className="text-sm font-extrabold text-white">{formatPrice(car.price)} <span className="text-[7px] text-zinc-400">{t.carCard.egp}</span></p>
+                                        <div className="flex gap-1">
+                                          <a href={`https://wa.me/${car.whatsapp || car.phone || myWhatsAppNumber}?text=${encodeURIComponent(t.chat.inquiry + car.name)}`}
+                                            onClick={e => e.stopPropagation()}
+                                            className="bg-[#25D366] p-1.5 rounded-full">
+                                            <MessageCircle size={10} className="text-white" />
+                                          </a>
+                                          <a href={`tel:+${car.phone || car.whatsapp || myWhatsAppNumber}`}
+                                            onClick={e => e.stopPropagation()}
+                                            className="bg-white/20 p-1.5 rounded-full">
+                                            <Phone size={10} className="text-white" />
+                                          </a>
+                                          <button
+                                            onClick={e => { e.stopPropagation(); toggleFavorite(car.id); }}
+                                            className="p-1.5 rounded-full bg-white/20 flex items-center justify-center">
+                                            <Heart size={9} className={`${favorites.includes(car.id) ? 'text-red-400 fill-red-400' : 'text-white'}`} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                      {(hasMore || loadingMore) && (
+                        <div ref={mobileObserverRef} className="flex justify-center py-4">
+                          {loadingMore ? (
+                            <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                          ) : (
+                            <div className="w-5 h-5" />
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()
+                ) : (
+                /* ── Vertical grid (for specific filters) ── */
+                <div className="grid grid-cols-2 gap-3 pb-4 pt-2 px-4 -mx-4">
+                  {displayCars.map(car => (
+                    <div key={car.id} onClick={() => handleSelectCar(car)}
+                      className={`relative rounded-xl overflow-hidden border border-white/20 bg-white/10 active:scale-[0.97] transition-all ${
+                        car.isVIP ? 'ring-1 ring-[#D4AF37]' : ''
+                      }`}>
+                      {car.isVIP && (
+                        <div className="absolute top-2 left-2 z-10 bg-[#D4AF37] px-1.5 py-0.5 rounded-full flex items-center gap-1 shadow-lg">
+                          <Star size={6} fill="white" stroke="none" />
+                          <span className="text-[5px] font-black text-white">{t.carCard.vip}</span>
+                        </div>
+                      )}
+                      <div className="relative aspect-square w-full">
+                        <Image
+                          src={optimizeImage(Array.isArray(car.image) ? car.image[0] : car.image, 300)}
+                          alt={car.name}
+                          fill unoptimized className="object-cover"
+                        />
+                      </div>
+                      <div className="p-2.5">
+                        <p className="text-[7px] text-zinc-400 font-bold uppercase tracking-wider mb-0.5">
+                          {car.category === 'car_wedding' ? t.filters.wedding : car.category === 'car_rental' ? t.filters.rental : car.category === 'flowers' ? t.filters.flowers : car.category === 'trip' ? t.filters.trips : car.category === 'car_package' ? t.filters.package : ''}
+                        </p>
+                        <h3 className="text-xs font-bold text-white leading-tight truncate">{car.name}</h3>
+                        <p className="text-sm font-extrabold text-white mt-1">{formatPrice(car.price)} <span className="text-[7px] text-zinc-400">{t.carCard.egp}</span></p>
+                        <div className="flex gap-1.5 mt-2">
+                          <a href={`https://wa.me/${car.whatsapp || car.phone || myWhatsAppNumber}?text=${encodeURIComponent(t.chat.inquiry + car.name)}`}
+                            onClick={e => e.stopPropagation()}
+                            className="bg-[#25D366] p-1.5 rounded-full flex-1 flex items-center justify-center gap-1">
+                            <MessageCircle size={9} className="text-white" />
+                            <span className="text-[6px] text-white font-bold">{t.detail.whatsapp}</span>
+                          </a>
+                          <a href={`tel:+${car.phone || car.whatsapp || myWhatsAppNumber}`}
+                            onClick={e => e.stopPropagation()}
+                            className="bg-white/20 p-1.5 rounded-full flex items-center justify-center">
+                            <Phone size={9} className="text-white" />
+                          </a>
+                          <button
+                            onClick={e => { e.stopPropagation(); toggleFavorite(car.id); }}
+                            className="p-1.5 rounded-full bg-white/20 flex items-center justify-center">
+                            <Heart size={9} className={`${favorites.includes(car.id) ? 'text-red-400 fill-red-400' : 'text-white'}`} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {(hasMore || loadingMore) && (
+                    <div ref={mobileObserverRef} className="col-span-2 flex justify-center py-4">
+                      {loadingMore ? (
+                        <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                      ) : (
+                        <div className="w-5 h-5" />
+                      )}
+                    </div>
+                  )}
+                </div>
+                )
+              ) : (
+                <div className="py-16 text-center">
+                  <Search size={36} className="mx-auto text-white/30 mb-3" />
+                  <p className="text-white/40 font-serif italic text-sm">{t.common.noResults}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Favorites Tab */}
+          {mobileTab === 'favorites' && (
+            <div className="px-4 pb-6">
+              <h2 className="font-serif text-lg italic text-white mb-4">{t.mobileNav.favorites} ❤️</h2>
+              {cars.filter(c => favorites.includes(c.id) && c.status === 'active').length > 0 ? (
+                <div className="space-y-4">
+                  {cars.filter(c => favorites.includes(c.id) && c.status === 'active').map(car => (
+                    <div key={car.id} onClick={() => handleSelectCar(car)}
+                      className="rounded-2xl overflow-hidden border border-white/20 bg-white/10 active:scale-[0.98] transition-all flex">
+                      <div className="relative w-20 h-20 flex-shrink-0">
+                        <Image src={optimizeImage(Array.isArray(car.image) ? car.image[0] : car.image, 400)}
+                          alt={car.name} fill unoptimized className="object-cover" />
+                      </div>
+                      <div className="flex-1 p-3 flex items-center justify-between">
+                        <div>
+                          <h3 className="text-sm font-extrabold text-white">{car.name}</h3>
+                          <p className="text-xs font-extrabold text-white mt-0.5">{formatPrice(car.price)} <span className="text-[8px] text-zinc-400">{t.carCard.egp}</span></p>
+                        </div>
+                        <button onClick={e => { e.stopPropagation(); toggleFavorite(car.id); }}
+                          className="w-7 h-7 rounded-full bg-red-500/20 flex items-center justify-center">
+                          <Heart size={11} className="text-red-400 fill-red-400" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-16">
+                  <Heart size={40} className="mx-auto text-white/20 mb-4" />
+                  <p className="text-white/40 text-sm font-serif italic">{t.common.noFavorites}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* More Tab */}
+          {mobileTab === 'more' && (
+            <div className="px-4 pb-6">
+              <h2 className="font-serif text-lg italic text-white mb-6">{t.mobileNav.more}</h2>
+              <div className="space-y-3">
+                {user && userProfile ? (
+                  <div className="bg-white/10 rounded-2xl p-4 border border-white/10 mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 rounded-full bg-[#c5a059]/20 flex items-center justify-center">
+                        <User size={20} className="text-[#c5a059]" />
+                      </div>
+                      <div>
+                        <p className="text-white text-sm font-bold">{userProfile.displayName || 'User'}</p>
+                        <p className="text-white/40 text-[10px]">{user.email}</p>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+                <Link href="/my-ads"
+                  onClick={() => setMobileTab('home')}
+                  className="flex items-center gap-3 bg-white/10 rounded-2xl p-4 border border-white/10 hover:bg-white/20 transition-all">
+                  <Heart size={18} className="text-white/60" />
+                  <span className="text-white text-sm">{t.more.myAds}</span>
+                </Link>
+                {isAdmin && (
+                  <Link href="/admin"
+                    onClick={() => setMobileTab('home')}
+                    className="flex items-center gap-3 bg-[#c5a059]/10 rounded-2xl p-4 border border-[#c5a059]/20 hover:bg-[#c5a059]/20 transition-all">
+                    <Star size={18} className="text-[#c5a059]" />
+                    <span className="text-[#c5a059] text-sm font-bold">{t.more.admin}</span>
+                  </Link>
+                )}
+                <Link href="/add-ad"
+                  onClick={() => setMobileTab('home')}
+                  className="flex items-center gap-3 bg-green-500/10 rounded-2xl p-4 border border-green-500/20 hover:bg-green-500/20 transition-all">
+                  <Plus size={18} className="text-green-400" />
+                  <span className="text-green-400 text-sm font-bold">{t.more.addAd}</span>
+                </Link>
+                <button onClick={() => setShowSupport(!showSupport)}
+                  className="w-full flex items-center gap-3 bg-white/10 rounded-2xl p-4 border border-white/10 hover:bg-white/20 transition-all text-right">
+                  <Phone size={18} className="text-white/60" />
+                  <span className="text-white text-sm">{t.more.support}</span>
+                </button>
+                {user ? (
+                  <button onClick={() => { signOut(); setMobileTab('home'); }}
+                    className="w-full flex items-center gap-3 bg-red-500/10 rounded-2xl p-4 border border-red-500/20 hover:bg-red-500/20 transition-all text-right">
+                    <LogOut size={18} className="text-red-400" />
+                    <span className="text-red-400 text-sm">{t.more.logout}</span>
+                  </button>
+                ) : (
+                  <Link href="/login"
+                    onClick={() => setMobileTab('home')}
+                    className="flex items-center gap-3 bg-[#c5a059]/10 rounded-2xl p-4 border border-[#c5a059]/20 hover:bg-[#c5a059]/20 transition-all">
+                    <User size={18} className="text-[#c5a059]" />
+                    <span className="text-[#c5a059] text-sm">{t.more.login}</span>
+                  </Link>
+                )}
+
+                {/* Language toggle - Mobile */}
+                <button onClick={toggleLang}
+                  className="w-full flex items-center gap-3 bg-white/10 rounded-2xl p-4 border border-white/10 hover:bg-white/20 transition-all text-right">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                  <span className="text-white text-sm">{t.more.language}: <span className="font-bold">{lang === 'ar' ? 'العربية' : 'English'}</span></span>
+                </button>
+
+                {/* Instagram */}
+                <a href="#" target="_blank" rel="noopener noreferrer"
+                  onClick={e => { e.preventDefault(); alert('قريباً...'); }}
+                  className="w-full flex items-center gap-3 bg-white/10 rounded-2xl p-4 border border-white/10 hover:bg-white/20 transition-all text-right">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+                  <span className="text-white text-sm">{t.more.instagram}</span>
+                </a>
+
+                {/* Facebook */}
+                <a href="#" target="_blank" rel="noopener noreferrer"
+                  onClick={e => { e.preventDefault(); alert('قريباً...'); }}
+                  className="w-full flex items-center gap-3 bg-white/10 rounded-2xl p-4 border border-white/10 hover:bg-white/20 transition-all text-right">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="text-white/60"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+                  <span className="text-white text-sm">{t.more.facebook}</span>
+                </a>
+              </div>
+
+              {showSupport && (
+                <div className="mt-4 bg-white/10 rounded-2xl p-5 border border-white/10 text-center">
+                  <p className="text-white text-sm font-bold mb-3">{t.more.support}</p>
+                  <div className="flex gap-3 justify-center">
+                    <a href={`https://wa.me/${myWhatsAppNumber}`} target="_blank"
+                      className="bg-[#25D366] text-white px-5 py-2.5 rounded-full text-[10px] font-bold flex items-center gap-2">
+                      <MessageCircle size={14} /> {t.nav.whatsapp}
+                    </a>
+                    <a href={`tel:+${myWhatsAppNumber}`}
+                      className="bg-white/20 text-white px-5 py-2.5 rounded-full text-[10px] font-bold flex items-center gap-2">
+                      <Phone size={14} /> {t.nav.call}
+                    </a>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+        </div>
+
+        {/* Bottom Navigation - Mobile */}
+        <div className="fixed bottom-0 left-0 right-0 z-[100] bg-[#0a0a0a]/95 backdrop-blur-xl border-t border-white/10 safe-area-bottom">
+          <div className="flex items-center justify-around py-2 px-2">
+            <button onClick={() => { setMobileTab('home'); setActiveFilter('all'); }}
+              className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl transition-all ${mobileTab === 'home' ? 'text-[#c5a059]' : 'text-white/40'}`}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+              <span className="text-[8px] font-bold tracking-[0.5px]">{t.mobileNav.home}</span>
+            </button>
+            <button onClick={() => setMobileTab('favorites')}
+              className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl transition-all ${mobileTab === 'favorites' ? 'text-[#c5a059]' : 'text-white/40'}`}>
+              <Heart size={20} />
+              <span className="text-[8px] font-bold tracking-[0.5px]">{t.mobileNav.favorites}</span>
+            </button>
+            <Link href="/add-ad"
+              className="flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl -mt-3">
+              <div className="w-12 h-12 rounded-full bg-[#c5a059] text-black flex items-center justify-center shadow-lg shadow-[#c5a059]/30">
+                <Plus size={22} />
+              </div>
+            </Link>
+            <button onClick={() => { setActiveFilter('rental'); setMobileTab('home'); }}
+              className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl transition-all ${mobileTab === 'home' && activeFilter === 'rental' ? 'text-[#c5a059]' : 'text-white/40'}`}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <span className="text-[8px] font-bold tracking-[0.5px]">{t.mobileNav.rental}</span>
+            </button>
+            <button onClick={() => setMobileTab('more')}
+              className={`flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl transition-all ${mobileTab === 'more' ? 'text-[#c5a059]' : 'text-white/40'}`}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg>
+              <span className="text-[8px] font-bold tracking-[0.5px]">{t.mobileNav.more}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
       {/* ════ FOOTER ════ */}
-      <footer className="relative z-10 py-16 bg-[#0a0a0a] border-t border-white/5 text-white">
+      <footer className="relative z-10 py-16 bg-[#0a0a0a] border-t border-white/5 text-white hidden md:block">
         <div className="max-w-7xl mx-auto px-10 flex flex-col md:flex-row justify-between items-center gap-10">
           <div className="flex flex-col items-center md:items-start gap-2">
             <p className="text-[10px] font-black uppercase tracking-[6px]">ZaFah</p>
-            <p className="text-[9px] font-bold tracking-[4px] opacity-40 uppercase">Excellence Defined</p>
+            <p className="text-[9px] font-bold tracking-[4px] opacity-40 uppercase">{t.common.excellenceDefined}</p>
+          </div>
+          <div className="flex items-center gap-6">
+            <a href="#" target="_blank" title="Instagram" className="text-white/30 hover:text-[#c5a059] transition-all duration-300"
+              onClick={e => { e.preventDefault(); alert('قريباً...'); }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="2" y="2" width="20" height="20" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" y1="6.5" x2="17.51" y2="6.5"/></svg>
+            </a>
+            <a href="#" target="_blank" title="Facebook" className="text-white/30 hover:text-[#c5a059] transition-all duration-300"
+              onClick={e => { e.preventDefault(); alert('قريباً...'); }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"/></svg>
+            </a>
           </div>
           <div className="flex items-center gap-4 group">
             <div className="h-[1px] w-12 bg-white/20 group-hover:w-20 transition-all duration-700" />
             <p className="font-serif italic text-lg text-zinc-400">
-              Developed by <span className="text-white font-bold ml-1">usf</span>
+              {t.common.developedBy} <span className="text-white font-bold ml-1">usf</span>
             </p>
           </div>
         </div>
@@ -990,6 +1621,7 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
   car: any; index?: number; onClick?: () => void; onShare?: (e: React.MouseEvent) => void;
   isFavorited?: boolean; onToggleFavorite?: (e: React.MouseEvent) => void;
 }) {
+  const { t } = useLanguage();
   return (
     <div className="group relative cursor-pointer" onClick={onClick}>
       <div className="absolute -inset-1 rounded-[2rem] bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none" />
@@ -1000,11 +1632,18 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
             src={optimizeImage(Array.isArray(car.image) ? car.image[0] : car.image, 400)}
             alt={car.name}
             fill
+            unoptimized
             sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
             priority={index < 3}
             className="object-cover transition-transform duration-[2s] group-hover:scale-105"
           />
           <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/10 to-transparent" />
+          {/* ── Quick Preview overlay ── */}
+          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center">
+            <span className="px-6 py-3 rounded-full border border-white/40 text-white text-[10px] font-bold uppercase tracking-[3px] backdrop-blur-md bg-white/10 hover:bg-white hover:text-black transition-all duration-300">
+              {t.carCard.view}
+            </span>
+          </div>
 
           {/* Badges row */}
           <div className="absolute top-4 left-4 right-4 flex justify-between items-start">
@@ -1014,7 +1653,7 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
               {(car.isVIP === true || car.isVIP === 'true') && (
                 <div className="bg-[#D4AF37] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md">
                   <Star size={10} fill="white" stroke="none" />
-                  <span className="text-[8px] font-black tracking-[2px] uppercase">VIP Choice</span>
+                  <span className="text-[8px] font-black tracking-[2px] uppercase">{t.carCard.vipChoice}</span>
                 </div>
               )}
               {/* ── Favorite Heart ── */}
@@ -1025,7 +1664,7 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
                     ? 'bg-red-500/20 border-red-400/50'
                     : 'bg-white/20 border-white/30 hover:bg-white'
                 }`}
-                title={isFavorited ? 'Remove from favorites' : 'Add to favorites'}
+                title={isFavorited ? t.detail.favoriteRemove : t.detail.favoriteAdd}
               >
                 <Heart size={13} className={`transition-colors ${isFavorited ? 'text-red-400 fill-red-400' : 'text-white'}`} />
               </button>
@@ -1033,21 +1672,23 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
               <button
                 onClick={onShare}
                 className="w-8 h-8 rounded-full bg-white/20 backdrop-blur-md border border-white/30 flex items-center justify-center hover:bg-white active:scale-90 transition-all duration-300 group/share shadow-md"
-                title="Share"
+                title={t.detail.shareTooltip}
               >
                 <Share2 size={13} className="text-white group-hover/share:text-black transition-colors" />
               </button>
             </div>
 
             <div className="bg-white/15 backdrop-blur-md text-white px-3 py-1 rounded-full border border-white/20">
-              <span className="text-[8px] font-bold tracking-[2px] uppercase">Active Fleet</span>
+              <span className="text-[8px] font-bold tracking-[2px] uppercase">{car.category === 'car_package' ? t.carCard.package : car.category === 'flowers' ? t.carCard.flowers : car.category === 'trip' ? t.carCard.trip : t.carCard.activeFleet}</span>
             </div>
           </div>
 
           {/* Car name bottom */}
           <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6">
-            <h3 className="font-serif text-2xl md:text-3xl italic text-white leading-tight drop-shadow-lg">{car.name}</h3>
-            <p className="text-[8px] text-white/50 uppercase tracking-[4px] font-bold mt-1">Premium Class</p>
+            <h3 className="text-xl md:text-2xl font-extrabold text-white leading-tight tracking-tight">{car.name}</h3>
+            <p className="text-[8px] text-white/50 uppercase tracking-[4px] font-bold mt-1">
+              {car.category === 'car_package' ? `📦 ${car.packageDetails?.split('\n').filter((l: string) => l.trim()).length || 0} ${t.carCard.cars}` : car.category === 'flowers' ? t.carCard.flowerBouquet : car.category === 'trip' ? t.carCard.tripService : t.carCard.premiumClass}
+            </p>
           </div>
         </div>
 
@@ -1055,14 +1696,14 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
         <div className="flex items-center justify-between px-5 md:px-6 py-4 md:py-5 bg-black/60 backdrop-blur-sm">
           <div>
             <p className="text-[9px] text-white/60 uppercase tracking-[3px] font-bold">
-              {car.category === 'car_rental' ? 'Per Day' : car.category === 'flowers' ? 'Price' : 'Per Day'}
+              {car.category === 'car_rental' ? t.carCard.perDay : car.category === 'car_package' ? t.carCard.package : car.category === 'flowers' ? t.carCard.price : car.category === 'trip' ? t.carCard.trip : t.carCard.perDay}
             </p>
             <p className="text-xl md:text-2xl font-extrabold text-white mt-0.5">
-              {car.price} <span className="text-[11px] text-white/60 font-bold">EGP</span>
+              {formatPrice(car.price)} <span className="text-[11px] text-white/60 font-bold">{t.carCard.egp}</span>
             </p>
           </div>
           <div className="flex items-center gap-2 bg-white/10 active:bg-white hover:bg-white group/btn rounded-2xl px-5 py-3 border border-white/20 transition-all duration-300">
-            <span className="text-[10px] font-extrabold uppercase tracking-[3px] text-white group-hover/btn:text-black transition-colors">View</span>
+            <span className="text-[10px] font-extrabold uppercase tracking-[3px] text-white group-hover/btn:text-black transition-colors">{t.carCard.view}</span>
             <ChevronRight size={14} className="text-white group-hover/btn:text-black transition-colors" />
           </div>
         </div>
@@ -1078,6 +1719,7 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
   trip: any; index?: number;
   isFavorited?: boolean; onToggleFavorite?: (e: React.MouseEvent) => void;
 }) {
+  const { t, dir } = useLanguage();
   const imageUrl = optimizeImage(
     Array.isArray(trip.image) ? trip.image[0] : trip.image || '/placeholder-car.png',
     400
@@ -1096,6 +1738,7 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
                 src={imageUrl}
                 alt={trip.name}
                 fill
+                unoptimized
                 className="object-cover transition-transform duration-700 group-hover:scale-110"
                 sizes="200px"
               />
@@ -1108,9 +1751,9 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
             </button>
           </div>
 
-          <div className="flex-1 p-2.5 md:p-6 flex flex-col justify-center text-right" dir="rtl">
+          <div className="flex-1 p-2.5 md:p-6 flex flex-col justify-center text-right" dir={dir}>
             <div>
-              <h3 className="font-serif text-sm md:text-2xl italic text-white font-semibold leading-tight">
+              <h3 className="font-serif text-sm md:text-2xl font-bold text-white leading-tight" style={{ fontFamily: "'Playfair Display',Georgia,serif" }}>
                 {trip.name}
               </h3>
               {(trip.fromLocation || trip.toLocation) && (
@@ -1126,18 +1769,18 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
             </div>
 
             <div className="flex md:items-center justify-between mt-2 md:mt-5 gap-1.5 md:gap-0 flex-col md:flex-row">
-              <p className="text-sm md:text-2xl font-extrabold text-white order-2 md:order-1">
-                {trip.price} <span className="text-[8px] md:text-[11px] text-zinc-400 font-bold">EGP</span>
-              </p>
+                <p className="text-sm md:text-2xl font-extrabold text-white order-2 md:order-1">
+                  {formatPrice(trip.price)} <span className="text-[8px] md:text-[11px] text-zinc-400 font-bold">{t.carCard.egp}</span>
+                </p>
               <div className="flex gap-1.5 order-1 md:order-2">
-                <a href={`https://wa.me/${trip.whatsapp || trip.phone || myWhatsAppNumber}?text=${encodeURIComponent("مرحباً، أنا مهتم بـ " + trip.name)}`}
+                <a href={`https://wa.me/${trip.whatsapp || trip.phone || myWhatsAppNumber}?text=${encodeURIComponent(t.chat.inquiryTrip + trip.name)}`}
                   target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1 bg-[#25D366] text-white px-2 md:px-5 py-1.5 md:py-2.5 rounded-full text-[7px] md:text-[10px] font-bold uppercase tracking-wider hover:bg-[#20bd5a] transition-all active:scale-95 shadow-md">
-                  <MessageCircle size={10} /> WhatsApp
+                  <MessageCircle size={10} /> {t.detail.whatsapp}
                 </a>
                 <a href={`tel:+${trip.phone || trip.whatsapp || myWhatsAppNumber}`}
                   className="flex items-center gap-1 bg-white/10 text-white px-2 md:px-5 py-1.5 md:py-2.5 rounded-full text-[7px] md:text-[10px] font-bold uppercase tracking-wider hover:bg-white/20 transition-all active:scale-95 shadow-md border border-white/10">
-                  <Phone size={10} /> Call
+                  <Phone size={10} /> {t.detail.call}
                 </a>
               </div>
             </div>

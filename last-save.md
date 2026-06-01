@@ -1,619 +1,283 @@
-# آخر التعديلات — الماستر (18 مايو 2026)
+# ZaFah — التوثيق الكامل (آخر تحديث: 1 يونيو 2026)
 
-## أوردر الرفع
+---
+
+## 🏗️ هيكل المشروع
+
+```
+app/
+├── page.tsx          # الصفحة الرئيسية — عرض العربيات/المشاوير + فلاتر + بحث + سيرش ذكي
+├── login/page.tsx    # تسجيل الدخول (Google Auth + Email/Password)
+├── admin/page.tsx    # لوحة تحكم الأدمن (CRUD + نشر/تعليق/حذف + فلاتر تصنيف)
+├── add-ad/page.tsx   # إضافة/تعديل إعلان (Stepped Form: Car/Flowers/Trips/Package)
+├── my-ads/page.tsx   # إعلانات المستخدم + تعديل + تجديد
+├── layout.tsx        # Root layout + SEO metadata + JSON-LD + ErrorBoundary + Twitter Cards + PWA icons
+└── globals.css       # تنسيقات + iOS fixes + RTL/LTR font switching
+
+components/
+└── ErrorBoundary.tsx  # Class-based error boundary (RTL fallback UI)
+└── ChatWidget.tsx     # (مقفول — return null)
+
+lib/
+├── AuthContext.tsx    # Google Sign-In + Admin check + persistence
+├── LanguageContext.tsx # i18n (عربي/إنجليزي) + localStorage try/catch + RTL/LTR
+├── translations.ts   # ~722 سطر — كل النصوص مترجمة (عربي + إنجليزي)
+├── firebase.ts       # Firebase config + offline persistence + try/catch
+├── useUpload.ts      # Canvas compress → Cloudinary unsigned upload
+└── utils.ts          # formatPhone() — بتحوّل 0→20 (مصر)
+
+public/
+├── sitemap.xml       # SEO sitemap
+├── manifest.json     # PWA manifest (مع أيقونات SVG)
+├── robots.txt        # SEO — يسمح للكل، يمنع /admin
+├── favicon.svg       # أيقونة الموقع (حرف Z دهبي)
+├── icon-192.svg      # PWA icon 192×192
+├── icon-512.svg      # PWA icon 512×512
+├── google8db74195b4431746.html  # Google Search Console verification
+├── f30-refined.jpg   # Hero background (BMW F30)
+└── placeholder-car.png
+
+firebase/
+├── firestore.rules       # قواعد Firestore — قابلة للنشر
+├── firestore.indexes.json # Composite indexes
+├── firebase.json         # Firebase project config
+└── .firebaserc           # project alias → luxe-drive-db
+```
+
+---
+
+## 🔥 Firebase Data Model
+
+**Collection `cars`**:
+```ts
+{
+  name: string,
+  price: string,
+  description: string,
+  image: string[],
+  phone: string,
+  whatsapp: string,
+  bookedDays: string[],
+  views: number,
+  isVIP: boolean,
+  status: 'active' | 'suspended',
+  category: 'car_wedding' | 'car_rental' | 'flowers' | 'trip' | 'car_package',
+  driver: 'with' | 'without' | 'both' | '',
+  location: string,
+  fromLocation: string,    // للـ trips
+  toLocation: string,      // للـ trips
+  packageDetails: string,  // للـ packages
+  bouquetName: string,     // للـ flowers
+  createdAt: Timestamp,
+  updatedAt: Timestamp,
+  expiryDate: Timestamp,
+  userId: string,
+  userEmail: string
+}
+```
+
+**Collection `favorites`**: `{ userId, carId, createdAt }`
+
+**Document `stats/global`**: `{ total_visits: number }`
+
+---
+
+## 🔥 Firestore Security Rules
+
+```
+cars collection:
+  read  → anyone
+  create → authenticated user (userId must match their auth.uid)
+  update → owner (userId) OR admin (yousefgaafer85@gmail.com)
+  delete → admin only
+
+favorites: user reads/writes own favorites only
+users: user reads/writes own profile, admin reads all
+stats: admin write only
+```
+
+**Deploy**: `firebase deploy --only firestore --project luxe-drive-db`
+
+---
+
+## 🔄 سير العمل (Workflow)
+
+```
+صاحب إعلان يسجل → يرفع (status: suspended)
+                      ↓
+ADMIN ينشّط من /admin + expiryDate = 30 يوم
+                      ↓
+الإعلان يظهر قدام الجميع لمدة 30 يوم
+                      ↓
+my-ads يعرض countdown + auto-suspend بعد expiryDate
+                      ↓
+صاحب الإعلان → واتساب ADMIN → ADMIN ينشّط تاني (30 يوم جديدة)
+```
+
+---
+
+## 🌐 نظام اللغات
+
+- **عربي (افتراضي)** + **إنجليزي** — toggle في النافبار والتبويب الجانبي
+- `lib/LanguageContext.tsx` يحفظ آخر لغة في `localStorage` (مع try/catch للـ iOS private browsing)
+- `lib/translations.ts` ~660 سطر — كل النصوص مترجمة
+- RTL/LTR تلقائي عبر `document.documentElement.dir`
+- الـ Hero text (Elite Selection) دايمًا عربي مش بيتغير
+
+---
+
+## ☁️ رفع الصور
+
+Canvas compress (max 1200px, JPEG 0.8) → Cloudinary unsigned upload → تخزين `secure_url` في Firestore.
+
+**مش محتاج env vars في Vercel** لأن الرفع مباشر من المتصفح.
+
+---
+
+## 🧪 تشغيل السيرفر محلياً
 
 ```bash
-git add .
-git commit -m "major update: auth system, user ads, admin panel, filters, favorites"
-git push origin main
+npm run dev -H 0.0.0.0 -p 3000        # HTTP (للديسكتوب)
+npm run build                          # Build production
+npm run start -H 0.0.0.0 -p 3000      # Run production
+npm run lint                           # ESLint
+npx tsc --noEmit                       # TypeScript check
+firebase deploy --only firestore       # نشر قواعد Firestore
+```
+
+### iOS testing
+iOS بيحظر HTTP على local network → استخدم Vercel deploy
+
+---
+
+## ✅ التعديلات — الإصدار v11.0 (30 مايو 2026)
+
+| # | التغيير | الملف | التفاصيل |
+|---|---------|-------|----------|
+| 1 | اسكرول أفقي للكل | `app/page.tsx` | فلتر "الكل" بيظهر كل حاجة في horizontal scroll |
+| 2 | Grid رأسي للفلاتر التانية | `app/page.tsx` | ورد/إيجار/مشاوير/باقات → grid 2 أعمدة |
+| 3 | فلتر الكل يظهر كل حاجة | `app/page.tsx` | إزالة الكود اللي كان بيخفي أنواع معينة من "الكل" |
+| 4 | الرئيسية → all | `app/page.tsx` | زر الرئيسية بيرجع لفلتر الكل |
+| 5 | Touch Swipe | `app/page.tsx` | سوايب باللمس للصور في المودال |
+| 6 | 🛎️ Notification Bell | `app/page.tsx` | جرس + badge + dropdown |
+| 7 | تحسين أداء اللاج | `app/page.tsx` | rAF للـ scroll + useMemo + passive events |
+| 8 | Firebase cache fix | `lib/firebase.ts` | try/catch حول persistentLocalCache لـ iOS |
+| 9 | ErrorBoundary | `components/` | كلاس جديد يلف الـ app |
+| 10 | SEO أولي | `app/layout.tsx` | meta tags + Google verification |
+| 11 | Sitemap | `public/sitemap.xml` | XML sitemap |
+| 12 | Elite Selection hide | `app/page.tsx` | بتختفي أول ما تسكرول |
+
+## ✅ التعديلات — الإصدار v12.0 (31 مايو 2026)
+
+| # | التغيير | الملف | التفاصيل |
+|---|---------|-------|----------|
+| 1 | إزالة Elite Selection من الموبايل | `app/page.tsx` | `hidden md:block` — الموبايل مش بيشوفه |
+| 2 | أسهم السكرول الأفقي | `app/page.tsx` | ChevronLeft/ChevronRight + gradient |
+| 3 | RTL-aware scroll | `app/page.tsx` | الأسهم تنقلب حسب اللغة |
+| 4 | SEO شامل | `app/layout.tsx` | 60+ كلمة مفتاحية عربي + إنجليزي |
+| 5 | JSON-LD Structured Data | `app/layout.tsx` | WebSite schema + SearchAction |
+| 6 | Sitemap محدث | `public/sitemap.xml` | URLs جديدة + تاريخ محدث |
+| 7 | metadataBase | `app/layout.tsx` | إضافة `metadataBase` |
+
+## ✅ التعديلات — الإصدار v13.0 (1 يونيو 2026) — الجلسة الحالية
+
+| # | التغيير | الملف | التفاصيل |
+|---|---------|-------|----------|
+| 1 | **🐛 Fix infinite loading skeleton** | `app/page.tsx` | إضافة `initialLoadDone` — لو Firebase فشل، ميفضلش skeleton للأبد، يظهر "لا توجد نتائج" |
+| 2 | **🔥 Firebase Rules — رفع** | `firestore.rules` | نَشر rules على Firebase Console عشان `cars` collection تقبل read |
+| 3 | **📊 Composite Index** | `firestore.indexes.json` | إنشاء index لـ `status ASC, createdAt DESC` + نشره |
+| 4 | **🎯 فئات 2×2 في الموبايل** | `app/add-ad/page.tsx:245` | `grid-cols-4` → `grid-cols-2 md:grid-cols-4` |
+| 5 | **📱 تصغير إعلانات my-ads** | `app/my-ads/page.tsx` | p-4/padding/border-radius/btn sizes/nh Smaller |
+| 6 | **🔘 فلاتر في لوحة الأدمن** | `app/admin/page.tsx` | filter chips: الكل/عربيات/باقات/ورد/مشاوير |
+| 7 | **🏷️ تحديث تسميات الفلاتر** | `lib/translations.ts` | زفه→عربيات زفاف, إيجار→عربيات إيجار, باكدج→باقات + English |
+| 8 | **🔐 تفويض المستخدمين** | `firestore.rules` | create → أي مسجل, update → صاحب الإعلان أو الأدمن, delete → أدمن فقط |
+| 9 | **🤖 robots.txt** | `public/robots.txt` | SEO — يسمح للكل، يمنع `/admin` |
+| 10 | **🖼️ أيقونات PWA + Favicon** | `public/favicon.svg`, `icon-192.svg`, `icon-512.svg` | أيقونات SVG جديدة + تحديث manifest.json |
+| 11 | **🐦 Twitter Cards** | `app/layout.tsx` | إضافة `twitter:card` + `twitter:image` للميتاداتا |
+| 12 | **🎨 themeColor في Metadata API** | `app/layout.tsx` | إضافة `themeColor: '#0a0a0a'` |
+| 13 | **🧹 تنظيف** | `public/` + `package.json` | حذف SVGs قديمة (globe/vercel/next/window/file) + إزالة framer-motion |
+
+## ✅ التعديلات — الإصدار v14.0 (1 يونيو 2026) — الصيانة الشاملة
+
+| # | التغيير | الملف | التفاصيل |
+|---|---------|-------|----------|
+| 1 | **🐛 Fix setState في useEffect** | `app/add-ad/page.tsx` | استخدام `useSearchParams` بدل `useEffect` مع `setEditId` — كان بيسبب re-render غير ضروري |
+| 2 | **🐛 Fix `<a>` بدل `<Link>`** | `app/login/page.tsx` | استبدال `<a href="/">` بـ `<Link href="/">` |
+| 3 | **🎨 تحسين تباين الألوان** | `app/admin/page.tsx` | تغيير `text-zinc-300` → `text-zinc-500` و `text-gray-300` → `text-gray-500` للـ empty state |
+| 4 | **🎨 تحسين تباين الألوان** | `app/page.tsx` | رفع `text-white/10` → `text-white/30` لأيقونات البحث، و `text-zinc-600` → `text-zinc-400` لزر الإغلاق |
+| 5 | **🖼️ إضافة alt للصور** | `app/admin/page.tsx`, `app/add-ad/page.tsx`, `app/my-ads/page.tsx` | إضافة `alt` لجميع وسوم `<img>` الناقصة |
+| 6 | **🧹 تنظيف ESLint (35→0 errors)** | كل الملفات | إزالة `@ts-nocheck` من 4 ملفات + استبدال الـ `any` بأنواع صريحة أو eslint-disable |
+| 7 | **🎯 سهم واحد للتمرير** | `app/page.tsx` | استبدال سهمين (يمين/يسار) بسهم واحد أصغر + RTL flip |
+| 8 | **🎨 نص الموبايل الرئيسي** | `app/page.tsx` | استبدال `{t.mobileHero.title}` بنص عربي ثابت بخط لاكشري + fade on scroll |
+| 9 | **📱 إعادة هيكلة الرئيسية** | `app/page.tsx` | تقسيم `activeFilter === 'all'` إلى أقسام: Packages → Wedding → Rental → Flowers → Trips — كل قسم بسكرول أفقي منفصل |
+| 10 | **💐 كروت مبسّطة للورد والمشاوير** | `app/page.tsx` | الورد/المشاوير: بدون driver/بدون تقويم — فقط صورة + سعر + واتساب + تليفون |
+| 11 | **📦 Suspense boundary** | `app/add-ad/page.tsx` | إضافة `<Suspense>` حول `AddAdContent` لدعم `useSearchParams` |
+
+---
+
+## 🎯 SEO — الكلمات المفتاحية المستهدفة
+
+### عربي
+```
+زفه, زفة, فرح, افراح, فستاين, فساتين زفاف,
+عربية فرح, سيارات زفاف, عربيات فرح,
+بوكيه ورد عروسه, بوكيه ورد, تنسيق ورد, ورد طبيعى, ورد صناعى, زهور, باقة ورد, ورود, توصيل ورد, ورود فرح, بوكيه فرح,
+ليموزين مصر, تاجير سيارات مصر, عربيه فاجره,
+ميكب ارتست مصر, قاعات افراح, بدله عريس, كوشه افراح, كوشة, دعوة زفاف,
+هدايا عرسان, ساعة فرح, اكسسوارات عرائس, خواتم فرح, كرفاته,
+تصوير زفاف, مصور فرح,
+زفه شبين الكوم, زفه منوفيه, زفه طنطا, زفه بنها, زفه دلتا, زفه القاهرة, زفه ملكه,
+زفاف مصر, حجز عربية فرح
+```
+
+### English
+```
+cars wedding, wedding, zafah, zafa, zafah wedding, zaffa, zafa car,
+wedding cars egypt, luxury car rental egypt, egypt wedding planner, bridal car,
+wedding limousine, menoufia wedding, tanta wedding,
+wedding flowers, flower bouquet, flower arrangement cairo
 ```
 
 ---
 
-## التعديلات اللي حصلت
+## ⚠️ المشاكل المعروفة (Known Issues)
 
-### 1️⃣ نظام تسجيل الدخول (Google Auth)
-
-- **ملف جديد**: `lib/AuthContext.tsx`
-- Google Sign-In مع Firebase Auth
-- أول مرة يسجل → auto-create document في `users` collection
-- Admin check: `yousefgaafer85@gmail.com` بس
-- Session persistence (لو سجل مرة وسكر الموقع، يفضل مسجل)
-- iOS fallback: لو البوب أب اتنين → يتحول redirect تلقائيًا
-- **تحديث**: `app/layout.tsx` — إضافة `<AuthProvider>`
-- **تحديث**: `app/login/page.tsx` — إضافة Google Sign-In + ديزاين جديد
-
-### 2️⃣ واجهة المستخدم (Navbar)
-
-- **تحديث**: `app/page.tsx`
-- زرار **Sign In** (جمب الـ Connect القديم)
-- لما يسجل: أيقونة User دايرة صفرا + اسمه → Dropdown فيه:
-  - ➕ إضافة إعلان
-  - ❤️ إعلاناتي
-  - ⭐ Admin Panel (للأدمن بس)
-  - 🚪 تسجيل خروج
-- **زرار الدعم الفني 🔵**: دايرة سودا — فتحها يظهر بوب أب فيه رقم واتساب واتصال
-- **إزالة زرار USF** (الـ fixed)
-- **إزالة "Luxury Service"** من الـ Navbar
-
-### 3️⃣ إضافة الإعلان (النموذج المتطور)
-
-- **ملف جديد**: `app/add-ad/page.tsx`
-- **Stepped Form**:
-  1. عربية ولا ورد؟
-  2. لو عربية → زفه ولا إيجار؟
-  3. بسائق ولا بدون؟
-  4. التفاصيل: اسم، سعر، مدينة (Dropdown: المنوفية، القاهرة، الجيزة، طنطا، المنصورة، بنها، شبين الكوم، الإسكندرية)، رقم اتصال، واتساب (اختياري)، وصف، صور (Cloudinary)، تقويم تفاعلي
-  5. لو ورد → اسم بوكيه، سعر، وصف، صور، رقم (مفيش تقويم)
-- عند النشر → `status: suspended` (معلق — في انتظار موافقة الأدمن)
-- التقويم التفاعلي: كبس على اليوم يتحجز (يتلون أحمر)، مع إمكانية التنقل بين الشهور، وعنوان الشهر واضح
-
-### 4️⃣ صفحة إعلاناتي
-
-- **ملف جديد**: `app/my-ads/page.tsx`
-- Protected route (لازم مسجل دخول)
-- يعرض اعلانات اليوزر بس (عن طريق `userId`)
-- كل إعلان: اسم، صورة، سعر، حالة (منشور/معلق)، فيوات، باقي الأيام
-- زرار تعديل → يفتح مودال فيه كل الحقول (نفس فورم الإضافة)
-- لو الإعلان قرب يخلص (أقل من 3 أيام) → يظهر تحذير أحمر
-- **إصلاح**: الـ query مكنش شغال بسبب الـ composite index — أصلحناه بـ client-side sort
-
-### 5️⃣ لوحة الأدمن (مطورة)
-
-- **تحديث**: `app/admin/page.tsx`
-- تقييد الدخول: `yousefgaafer85@gmail.com` بس
-- إزالة الفورم (الأدمن بيستخدم `/add-ad` زي أي يوزر)
-- تقسيط الإعلانات: **قسم العربيات** و**قسم بوكيهات الورد** (كل واحد في section)
-- كل إعلان باين: الحالة (منشور/معلق)، الفيوات، الأيام المحجوزة، صاحب الإعلان
-- أزرار لكل إعلان:
-  - **نشر/تعليق** (Toggle status: active ↔ suspended)
-  - **VIP** (تمييز)
-  - **تعديل** (بيروح لـ `/add-ad?edit=id`)
-  - **حذف**
-- لما ينشر → `expiryDate` = دلوقتي + 30 يوم
-
-### 6️⃣ الفلاتر في الصفحة الرئيسية
-
-- **تحديث**: `app/page.tsx`
-- أزرار فلتر: 🚗 عربيات (الافتراضي) • 🎊 زفه • 🚙 إيجار • 💐 ورد • ❤️ مفضلة
-- الـ **ورد** بيظهر بس في فلتر "💐 ورد" — مش في "🚗 عربيات"
-- تحت فلتر زفه/إيجار → فلتر فرعي: بسائق/بدون
-- البحث الذكي (150+ موديل) شغال عادي مع الفلاتر
-- بتظهر بس الإعلانات الـ `status === 'active'`
-
-### 7️⃣ نظام المفضلة
-
-- قلب ❤️ على كل كارت عربية
-- **للـ Client (مش مسجل)**: localStorage على الجهاز
-- **للمستخدم المسجل**: Firebase (مرتبط بـ userId)
-- فلتر "مفضلة" يعرض المحفوظات
-- القلب يتلون أحمر لو العربية في المفضلة
-
-### 8️⃣ واتساب برسالة جاهزة
-
-- زرار الواتساب في المودال بيبعت رسالة جاهزة:
-  > **مرحباً، أنا مهتم بـ [اسم العربية]**
-
-### 9️⃣ تحسين التوافق مع iOS/الموبايل
-
-- CSS fixes للـ iOS Safari (`-webkit-fill-available`, `-webkit-overflow-scrolling`)
-- الـ modals تعمل scroll صح
-- Google Sign-In fallback للـ popup blocker
-
-### 🔟 تصميم وتحسينات
-
-- نفس الديزاين الأسود/الدهبي الفخم
-- الأرقام: **رقم اتصال + واتساب** (اتشيل رقم تاني)
-- التقويم: نص أحمر "🔴 حدد الأيام اللي العربية فيها محجوزة" + عنوان الشهر واضح + أسهم مكتوب عليها "السابق" و"التالي"
+| المشكلة | السبب | الحل المقترح |
+|---------|-------|--------------|
+| **ChatWidget.tsx مقفول** | `return null` في أول السطر | محتاج n8n webhook شغال |
+| **Phone prefix 0→20** | `formatPhone()` في utils.ts | auto-prefix لمصر (متعمد) |
+| **شاشة سودة على iOS HTTP** | iOS Safari بيحظر HTTP على local network | Vercel deploy / HTTPS |
+| **Next.js images unoptimized** | كل صور Cloudinary عليها `unoptimized` | متعمد (عشان Cloudinary handles optimization) |
+| **~~@ts-nocheck في 4 ملفات~~ — تم الحل** | page.tsx, admin, my-ads, add-ad | اتحذف `@ts-nocheck` واتستبدل بـ eslint-disable للـ `any` types + تصليح implicit anys |
+| **self-signed cert مش موثوق** | iOS/Chrome بيحذر من certs غير موثوقة | deploy على Vercel أحسن |
+| **PWA icons SVG مش PNG** | الأيقونات SVG مش PNG | شغالة على المتصفحات الحديثة، للتوافق الكامل حوّلها لـ PNG |
 
 ---
 
-## الملفات الجديدة
+## 🧪 ملاحظات الاختبار
 
-| الملف | الوظيفة |
-|-------|---------|
-| `lib/AuthContext.tsx` | Google Sign-In + Admin check + persistence |
-| `app/add-ad/page.tsx` | نموذج إضافة إعلان متطور (Stepped Form) |
-| `app/my-ads/page.tsx` | صفحة إعلاناتي (عرض + تعديل + تحليلات) |
-
-## الملفات المحدثة
-
-| الملف | التغييرات |
-|-------|-----------|
-| `app/layout.tsx` | إضافة `AuthProvider` |
-| `app/page.tsx` | 600+ سطر — Auth UI + Filters + Favorites + Support + WhatsApp |
-| `app/login/page.tsx` | Google Sign-In + ديزاين جديد |
-| `app/admin/page.tsx` | Admin-only + status toggle + أقسام + حذف الفورم |
-| `app/globals.css` | iOS fixes + scroll fixes |
-
-## ملحوظة
-
-ChatWidget لسه مقفول بـ `return null` — لو عاوز تشغله محتاج n8n على السيرفر.
+- **Dev server**: `npm run dev -H 0.0.0.0 -p 3000`
+- **Build**: `npm run build` → 6/6 static pages (200 OK)
+- **TypeScript**: `npx tsc --noEmit` → Zero errors
+- **ESLint**: `npm run lint` → **0 errors**, 18 warnings (unused imports + `<img>` vs `<Image>` — كلها warnings)
+- **Firebase**: rules + indexes بتننشر بـ `firebase deploy --only firestore`
+- **iOS**: HTTP ممنوع → استخدم Vercel
+- **المستخدمين**: لازم يكونوا مسجلين عشان ينشروا إعلانات
 
 ---
 
-# تحديث 18 مايو 2026 — الدفعة الثانية (v2.0)
-
-## أوردر الرفع
-
-```bash
-git add .
-git commit -m "v2.0: auth fixes, favorites Firebase, infinite scroll, phone formatting, UX improvements"
-git push origin main
-```
-
-## التعديلات اللي حصلت
-
-### 1️⃣ تسجيل الدخول — إصلاح شامل
-
-| المشكلة | الملف | الحل |
-|---------|-------|------|
-| **Safari iOS Popup ممنوع** | `lib/AuthContext.tsx` | كشف iOS + Standalone (PWA) واستخدام `signInWithRedirect` مباشرة |
-| **Popup بيفشل وفي خطأ تاني** | `lib/AuthContext.tsx` | تسجيل الـ error في الكونسول + تحسين معالجة الأخطاء |
-| **`getRedirectResult` مش بينقل المستخدم** | `lib/AuthContext.tsx` | `router.push('/')` بعد نجاح الـ redirect + تحسين الـ catch |
-| **بعد ما يسجل login — مش بينزل تحت** | `app/login/page.tsx` | `useEffect` auto-redirect لو المستخدم authenticated خلاص |
-| **Admin page كانت بتعمل loop** | `app/admin/page.tsx` | تصحيح `authLoading` → `loading: authLoading` (كان متغير غلط) |
-| **Sign In في الهوم بيشغل Google مباشرة** | `app/page.tsx` | تغيير لـ `<Link href="/login">` عشان المستخدم يقدر يستخدم إيميل/باسوورد |
-
-### 2️⃣ المفضلة — Firebase للمسجلين
-
-| المشكلة | الملف | الحل |
-|---------|-------|------|
-| **المفضلة مش شغالة للمسجلين** | `app/page.tsx` | إضافة كوليكشن `favorites` في Firestore — `{ userId, carId, createdAt }` |
-| **ترحيل localStorage → Firebase** | `app/page.tsx` | عند تسجيل الدخول، دمج المفضلة المحلية مع Firebase وتفريغ localStorage |
-| **Toggle favorites** | `app/page.tsx` | المسجل: addDoc/deleteDoc في Firebase. الضيف: localStorage |
-| **Race condition** | `app/page.tsx` | استخدام `setFavorites(prev => ...)` مع localStorage جوه الـ callback |
-
-### 3️⃣ Infinite Scroll + Pagination
-
-| الميزة | الملف | التفاصيل |
-|--------|-------|----------|
-| 6 عربيات كل شحنة | `app/page.tsx` | `query(cars, orderBy("createdAt", "desc"), limit(6))` |
-| تحميل تلقائي | `app/page.tsx` | `IntersectionObserver` — لما يوصل لآخر حاجة، يجيب 6 تانيين |
-| Loader | `app/page.tsx` | Spinner + نص "Loading more..." تحت القائمة |
-| إلغاء الكاش القديم | `app/page.tsx` | إزالة cache system (استبدل بـ pagination) |
-
-### 4️⃣ رقم التليفون — تنسيق موحد
-
-| الملف | التغيير |
-|-------|---------|
-| `lib/utils.ts` (**جديد**) | `formatPhone()` دالة: تظبط `+2010` / `010` / `2010` / `10` كلهم لـ `2010...` |
-| `app/add-ad/page.tsx` | استخدام `formatPhone()` عند الإضافة |
-| `app/my-ads/page.tsx` | استخدام `formatPhone()` عند التعديل |
-
-### 5️⃣ Search Suggestions
-
-| المشكلة | الحل |
-|---------|------|
-| الـ `useEffect` مش متابع `activeFilter`, `driverFilter`, `favorites` | إضافة كل الـ dependencies للـ useEffect عشان الـ suggestions تبقى up-to-date |
-
-### 6️⃣ شكل المودال — تحسينات
-
-| التغيير | السطر |
-|---------|-------|
-| اسم العربية: `font-semibold` (كان `font-light`) | `page.tsx:683` |
-| إزالة الخط الـ تحت الاسم (الـ `<div>`) | `page.tsx` |
-| الوصف: `font-medium` ولون أغمق | `page.tsx` |
-| السعر في الكارد: `font-extrabold text-2xl` | `page.tsx` |
-| أيام التقويم: `font-bold` + أوضح | `page.tsx` |
-
-### 7️⃣ Chat API + SpeedInsights — إزالة
-
-| الملف | الإجراء |
-|-------|---------|
-| `app/api/chat/route.ts` | حذف الملف بالكامل |
-| `components/ChatWidget.tsx` | تعطيل (export default function مع return null) |
-| `app/layout.tsx` | إزالة `import { SpeedInsights }` |
-
-### 8️⃣ موارد جديدة
-
-| الملف | الوظيفة |
-|-------|---------|
-| `public/placeholder-car.png` | صورة placeholder للعربيات اللي ملهاش صور |
-
-### 9️⃣ ملفات جديدة
-
-| الملف | الوظيفة |
-|-------|---------|
-| `lib/utils.ts` | دوال مساعدة (`formatPhone`) |
-
-### 🔟 ملخص التغييرات (v2)
-
-| الملف | نوع التغيير |
-|-------|------------|
-| `lib/AuthContext.tsx` | تحديث — Google Auth + Redirect + error handling |
-| `lib/utils.ts` | **جديد** — دوال مساعدة |
-| `app/page.tsx` | تحديث — Infinite Scroll + Favorites Firebase + Search + شكل |
-| `app/login/page.tsx` | تحديث — Auto-redirect + error logging |
-| `app/admin/page.tsx` | تحديث — Fix `loading` alias |
-| `app/add-ad/page.tsx` | تحديث — `formatPhone()` |
-| `app/my-ads/page.tsx` | تحديث — `formatPhone()` في التعديل |
-| `app/layout.tsx` | تحديث — إزالة SpeedInsights |
-| `components/ChatWidget.tsx` | تحديث — تعطيل كامل |
-| `app/api/chat/route.ts` | **حذف** |
-| `public/placeholder-car.png` | **جديد**
-
----
-
-# تحديث 18 مايو 2026 — الدفعة الثالثة (v3.0): إصلاح Google Sign-In
-
-## أوردر الرفع
-
-```bash
-git add .
-git commit -m "v3.0: fix Google Sign-In — getRedirectResult + iOS redirect + select_account + error messages"
-git push origin main
-```
-
-## التعديلات
-
-| المشكلة | الملف | الحل |
-|---------|-------|------|
-| **iOS بعد الـ redirect بيفضل واقف (مش بيسجل)** | `lib/AuthContext.tsx` | إعادة `getRedirectResult` — لازم عشان iOS يكمل تسجيل الدخول بعد redirect بدون `setUser` متكرر (بيستخدم `window.location.href` بدل `router.push` عشان dependent) |
-| **مفيش `select_account`** | `lib/AuthContext.tsx` | إضافة `provider.setCustomParameters({ prompt: 'select_account' })` عشان يجبر المستخدم يختار حساب جوجل دايمًا |
-| **`router.push('/')` بيتنفذ بعد `signInWithRedirect`** | `app/login/page.tsx` | شيل `router.push('/')` من `handleGoogleSignIn` — الـ `useEffect` في اللوجين بيديركت لوحده |
-| **رسالة خطأ عامة "فشل" ملهاش معنى** | `app/login/page.tsx` | إضافة رسايل خطأ بالعربي حسب `error.code` (مش مفعل، popup ممنوع، domain مش مضاف، إلخ) |
-| **`zafah.vercel.app` مش مضاف في Authorized domains** | Firebase Console | إضافة `zafah.vercel.app` في Firebase > Authentication > Settings > Authorized domains |
-
-## فحص التسليم
-
-- [x] Google Sign-In على اللابتوب (Popup) — شغال ✅
-- [x] Google Sign-In على iPhone (Redirect + getRedirectResult) — شغال ✅
-- [x] رسايل خطأ بالعربي حسب الكود
-- [x] `select_account` بيظهر اختيار الحساب دايمًا
-
----
-
-# تحديث 18 مايو 2026 — الدفعة الرابعة (v4.0): تعديل الإعلانات + تسريع التحميل + إصلاح iOS
-
-## أوردر الرفع
-
-```bash
-git add .
-git commit -m "v4.0: edit ads + speed improvements + iOS Google Sign-In fix"
-git push origin main
-```
-
-## التعديلات
-
-### 1️⃣ تعديل الإعلان من `/add-ad?edit=id`
-**الملف:** `app/add-ad/page.tsx`
-
-| المشكلة | الحل |
-|---------|-------|
-| **زرار تعديل من `/admin` بيودي على `/add-ad?edit=id` بس الصفحة بتظهر فورم فاضي** | إضافة قراءة `edit` parameter من URL عن طريق `URLSearchParams(window.location.search)` |
-| **مفيش pre-fill للفورم** | إضافة `useEffect` يجيب بيانات الإعلان من Firestore (`getDoc`) ويحطها في كل الحقول (type, carType, driver, name, price, phone, images, bookedDays, location, description, bouquetName, whatsapp) |
-| **دايمًا بيعمل `addDoc` (إضافة جديد) حتى لو تعديل** | التفرقة: لو `editMode` → `updateDoc(doc(db, 'cars', editId))` مع الحفاظ على `createdAt`, `views`, `isVIP`, `status` الأصليين. لو جديد → `addDoc` |
-| **زرار "إرسال للمراجعة" بيظهر حتى في التعديل** | تغيير النص لـ "حفظ التعديلات 💾" لما يكون في edit mode |
-| **Nav title "New Listing" بيظهر في التعديل** | تغيير لـ "Edit Listing" في edit mode |
-
-### 2️⃣ إزالة شرط `isIOS` من Google Sign-In (إصلاح iOS)
-**الملف:** `lib/AuthContext.tsx`
-
-| المشكلة | الحل |
-|---------|-------|
-| **iOS Safari بيفضل واقف بعد ما يختار الإيميل** | شيل `isIOS` من شرط الـ Redirect — خلّي Standalone (PWA) بس يستخدم `signInWithRedirect` |
-| **iOS 15+ بيشتغل معاه Popup عادي** | كل الأجهزة دلوقتي (لابتوب، اندرويد، iOS Safari) بتجرب `signInWithPopup` أولاً |
-| **لو الـ Popup منع أو اتنقلق** → `signInWithRedirect` fallback |
-| **PWA (الموقع المثبت)** → `signInWithRedirect` مباشر (الـ Popup مش شغال في الـ PWA) |
-
-النتيجة: **Google Sign-In شغال على كل الأجهزة والمتصفحات.**
-
-### 3️⃣ تسريع تحميل الموقع
-**الملف:** `lib/firebase.js`
-
-| التحسين | التفاصيل |
-|---------|----------|
-| **Firestore offline persistence** | تفعيل `enableMultiTabIndexedDbPersistence(db)` — بعد أول تحميل، Firestore بيحفظ الداتا في IndexedDB على التليفون. الزيارات التانية: البيانات تظهر **فوراً** من الكاش، والتحديثات تجي في الخلفية |
-
-**الملف:** `app/page.tsx`
-
-| التحسين | التفاصيل |
-|---------|----------|
-| **localStorage cache (stale-while-revalidate)** | قبل طلب Firestore، يقرا من `luxe_cars_cache` في localStorage. لو موجود وأقل من 5 دقايق، يعرض الداتا فوراً. بعدها يجيب جديد من Firestore ويحدث |
-| **تصغير صور Cloudinary** | إضافة دالة `optimizeImage(url, width)` — تضيف `/w_400,q_auto/` أو `/w_800,q_auto/` في رابط الصورة. من 500KB → 50KB للصورة |
-| **Loading skeleton** | كان موجود أصلاً — 6 كروت رمادية (`animate-pulse`) تظهر لحد ما الداتا تجهز |
-
-### 4️⃣ إضافة `zafah.vercel.app` في Authorized domains
-**Firebase Console > Authentication > Settings**
-
-| المشكلة | الحل |
-|---------|-------|
-| **`auth/unauthorized-domain`** — النطاق مش مضاف | إضافة `zafah.vercel.app` في Authorized domains |
-
-### 5️⃣ تنظيف
-- حذف `public/firebase-links.md` (ملف مؤقت للينكات)
-- حذف `.opencode/plans/firebase-links.md`
-
-## الملفات المعدلة
-
-| الملف | التغيير |
-|-------|---------|
-| `lib/firebase.js` | + offline persistence |
-| `lib/AuthContext.tsx` | إزالة isIOS شرط + getRedirectResult + select_account |
-| `app/login/page.tsx` | شيل router.push + رسايل خطأ بالعربي |
-| `app/add-ad/page.tsx` | **إضافة edit flow كامل** (قراءة URL + pre-fill + updateDoc) |
-| `app/page.tsx` | + optimizeImage + cache stale-while-revalidate |
-| `last-save.md` | توثيق التعديلات |
-
----
-
-# تحديث 18 مايو 2026 — الدفعة الخامسة (v5.0): خيار سائق/بدون سائق + رفع صور من الموبايل + تسريع التحميل
-
-## أوردر الرفع
-
-```bash
-git add .
-git commit -m "v5.0: driver both option, mobile image upload via API proxy, favorites perf"
-git push origin main
-```
-
-## التعديلات
-
-### 1️⃣ خيار "سائق وبدون سائق" (Driver: both)
-| الملف | التغيير |
-|-------|---------|
-| `app/add-ad/page.tsx` | إضافة زر تالت في Step 2: **سائق وبدون سائق** (`driver: 'both'`) — الـ UI بقى 3 أزرار بـ `grid-cols-3` |
-| `app/add-ad/page.tsx` | تحديث الـ summary السفلي ليعرض "سائق وبدون سائق" |
-| `app/page.tsx` | تعديل فلتر driver — العربيات الـ `driver='both'` تظهر في اختيار "بسائق" و"بدون سائق" |
-| `app/my-ads/page.tsx` | إضافة اختيار السواق في EditModal (بسائق / بدون / سائق وبدون) |
-| `app/admin/page.tsx` | إظهار badge السواق في لوحة التحكم (أزرق: بسائق / بنفسجي: سائق وبدون / رمادي: بدون) |
-
-### 2️⃣ رفع الصور — حل لمشكلة الموبايل (بديل CldUploadButton)
-| الملف | التغيير |
-|-------|---------|
-| `app/api/upload/route.ts` | **جديد** — API route وسيط: يستقبل الـ file من العميل، يقراه كـ ArrayBuffer، يرسله لـ Cloudinary unsigned upload |
-| `app/add-ad/page.tsx` | استبدال `CldUploadButton` بـ `<input type="file">` مخفي + `<label>` منمّق — الرفع عبر `/api/upload` بدل direct Cloudinary |
-| `app/my-ads/page.tsx` | نفس التغيير — رفع الصور عبر `/api/upload` |
-
-**سبب المشكلة:** `CldUploadButton` بيفتح pop-up widget من Cloudinary. على iOS/Android الـ pop-up بيتقفل أو مش بيشتغل. الحل: `<input type="file">` الأصلي (بيشتغل على كل حاجة) + API route وسيط (عشان مفيش CORS).
-
-**سبب فشل التحميل الأول:** الـ API route كان بيحط الـ `File` object جوه `FormData` جديد وتبعته لـ Cloudinary — لكن Node.js مش بينقل بيانات الـ File صح في الحالة دي. الحل: قراءة الـ File كـ `ArrayBuffer` وعمل `Blob` جديد بيه قبل الإرسال.
-
-### 3️⃣ تسريع تحميل الموقع لليوزر المسجل
-| الملف | التغيير |
-|-------|---------|
-| `app/page.tsx` | تحسين favorites sync: بدال loop فردي `setDoc` لكل favourite، بيعمل `Promise.all` على الفرق بس (local - firestore) |
-| | أول تسجيل: يرحل الـ local favourites اللي مش موجودة في Firebase فقط |
-| | التسجيلات التالية: صفر writes (الـ diff فاضي) — أسرع حاجة |
-
-## الملفات الجديدة
-| الملف | الوظيفة |
-|-------|---------|
-| `app/api/upload/route.ts` | API proxy لرفع الصور لـ Cloudinity من السيرفر |
-
-## الملفات المعدلة
-| الملف | التغيير |
-|-------|---------|
-| `app/add-ad/page.tsx` | + خيار سائق وبدون سائق + رفع صور بـ input file + API route |
-| `app/page.tsx` | + فلتر both + تحسين favorites sync |
-| `app/my-ads/page.tsx` | + خيار سواق في EditModal + رفع صور بـ input file |
-| `app/admin/page.tsx` | + عرض driver badge |
-| `last-save.md` | توثيق التعديلات |
-
-## ملحوظة
-- الرفع بيحتاج Upload Preset `ml_default` في Cloudinary يكون **Unsigned** — تأكد من Cloudinary Dashboard > Settings > Upload > Upload presets > ml_default > Signing Mode = Unsigned
-
----
-
-# تحديث 19 مايو 2026 — v6.0: حل مشكلة رفع الصور (Base64 في Firestore + Canvas Compression)
-
-## ملخص المشكلة
-رفع الصور من الموبايل (iPhone/Android) كان بيفشل بسبب:
-1. **Cloudinary unsigned upload** → "Unknown API key" (حتى مع Unsigned preset)
-2. **Signed upload (cloudinary SDK)** → "Must supply api_secret" (env var مش موجود وقت build)
-3. **Unsigned upload مع transformation** → "Unknown API key"
-4. **Unsigned upload بسيط** → 502 timeout من Vercel (Hobby plan 10s)
-5. **Firebase Storage** → مش مفعل في الحساب (محتاج فلوس)
-
-## الحل النهائي — Canvas Compression + Base64 في Firestore
-
-بدل ما نرفع الصور لسيرفر خارجي، بنضغطها على جهاز المستخدم باستخدام Canvas وبعدين نخزنها كـ Base64 string جوه Firestore.
-
-### الـ flow
-
-```
-صورة خام (4MB JPEG)
-  ↓
-Canvas: resize 1200px + JPEG 85%
-  ↓  (على جهاز المستخدم — فوري)
-Blob ~150KB
-  ↓
-FileReader → Base64 string (data:image/...)
-  ↓  (أو toDataURL fallback لو toBlob فشل)
-Base64 ~200KB
-  ↓
-حفظ direct في Firestore cars.image[]
-  ↑  (لا timeout, لا API خارجي, لا env vars)
-  ↓
-عرض: <img src={base64 string} /> — مفيش CDN
-```
-
-### التغييرات
-
-| الملف | التغيير |
-|-------|---------|
-| `lib/useUpload.ts` | **إعادة كتابة كاملة** — الرفع بقى Canvas → Base64 مباشر. `toBlob` أساسي، `toDataURL` fallback لـ iOS. Timeout 30s لتحميل الصورة. Progress خلال مراحل الضغط |
-| `lib/firebase.js` | رجوع للوضع الأصلي — تم إزالة `getStorage` (مش محتاجين Firebase Storage) |
-| `app/add-ad/page.tsx` | بسيط: إزالة `userId` parameter من استدعاء `uploadWithProgress` |
-| `app/my-ads/page.tsx` | بسيط: إزالة `userId` prop من EditModal |
-| `app/api/upload/route.ts` | **حذف الملف بالكامل** — مش محتاجين API route للسيرفر |
-| `app/api/` | **حذف المجلد بالكامل** |
-| `firebase-rules.md` | **جديد** — ملف فيه كل قواعد Firestore + Storage للنسخ واللصق |
-
-### تفاصيل تقنية — `lib/useUpload.ts`
-
-| الدالة | الوظيفة |
-|--------|---------|
-| `loadImage(file)` | تحميل الصورة في `Image` element مع timeout 30s |
-| `drawOnCanvas(img)` | رسم الصورة على Canvas بمقاس max 1200px مع الحفاظ على الـ aspect ratio |
-| `canvasToBase64(canvas)` | تحويل الـ Canvas لـ Base64: `toBlob` أولاً ← لو رجع `null` (iOS) → `toDataURL` fallback |
-| `uploadWithProgress(file, onProgress)` | الدالة الرئيسية — بتستدعي الثلاثة دوال فوق مع تحديث progress (10% → 30% → 50% → 100%) |
-
-### المشاكل اللي اتصلحت
-
-| المشكلة | الحل |
-|---------|------|
-| **Canvas.toBlob() بيرجع null على iOS Safari** | إضافة fallback: `canvas.toDataURL('image/jpeg', QUALITY)` |
-| **تحميل الصورة معلق على الموبايل (netwaok بطيء)** | Timeout 30s مع رسالة "انتهت مهلة تحميل الصورة" |
-| **Vercel timeout 10s** | تم الحذف — مفيش server-side code خالص |
-| **Cloudinary "Unknown API key"** | تم الاستغناء عن Cloudinary تماماً |
-| **Firebase Storage مش مفعل** | مش محتاجينه — بنحفظ Base64 مباشر في Firestore |
-| **No progress indicator** | progress percentage خلال مراحل الضغط (0% → 10% → 30% → 50% → 100%) |
-
-### ملاحظات مهمة
-
-- **الحد الأقصى:** Firestore document 1MB. الصورة الواحدة ~200KB Base64. ممكن 4-5 صور بأمان.
-- **الـ optimizeImage()** في `page.tsx` مش بتأثر على Base64 URLs (بتعديهم زي ما هم).
-- **الصور القديمة في Cloudinary** لسه شغالة — `optimizeImage()` بتشتغل على URLs اللي فيها `res.cloudinary.com`.
-- **الـ upload_preset مش محتاج unsigned** — مش بنستخدم Cloudinary للرفع خالص.
-
-### أوردر الرفع النهائي
-
-```bash
-git add .
-git commit -m "fix: store compressed base64 images in Firestore + iOS canvas fallback"
-git push origin main
-```
-
-### الملفات المعدلة في هذا التحديث
-
-| الملف | التغيير |
-|-------|---------|
-| `lib/useUpload.ts` | إعادة كتابة — Canvas → Base64 مع iOS fallback |
-| `lib/firebase.js` | إزالة `getStorage` |
-| `app/add-ad/page.tsx` | إزالة `userId` parameter |
-| `app/my-ads/page.tsx` | إزالة `userId` prop |
-| `app/api/upload/route.ts` | حذف |
-| `firebase-rules.md` | **جديد** — قواعد Firestore + Storage |
-| `last-save.md` | توثيق التعديلات |
-
----
-
-# تحديث 19 مايو 2026 — v7.0: قسم Trips (المشاوير)
-
-## أوردر الرفع
-
-```bash
-git add .
-git commit -m "v7.0: new Trips category — add, filter, list display, admin"
-git push origin main
-```
-
-## التعديلات
-
-### 1️⃣ نوع إعلان جديد: Trips
-
-**البيانات**: `category: 'trip'` في كوليكشن `cars` — مستقل عن العربيات والورد. بيظهر بس في فلتر Trips.
-
-| الحقل | الوصف |
-|-------|-------|
-| `name` | اسم المشوار (مثلاً: مشوار مطار القاهرة) |
-| `fromLocation` | نقطة الانطلاق |
-| `toLocation` | نقطة الوصول |
-| `price` | السعر |
-| `description` | وصف الرحلة |
-| `image` | صور (array) |
-| `phone` / `whatsapp` | أرقام الاتصال |
-| `category` | `'trip'` |
-| `status` | `'suspended'` — في انتظار موافقة الأدمن |
-
-**لا يحتوي** على: `bookedDays`, `driver`, `bouquetName`.
-
-### 2️⃣ رفع الإعلان — `app/add-ad/page.tsx`
-
-- **Step 0**: 3 أزرار بدل 2 — 🚗 Car • 💐 Flowers • 🗺️ Trips
-- اختيار Trips → يودي على تفاصيل مباشر (زي الورد)
-- حقول Trips: **اسم المشوار** + **من** + **إلى** (بدل اسم العربية + الموقع)
-- مفيش تقويم أيام محجوزة
-- مفيش خيار سواق
-
-### 3️⃣ الفلتر في الصفحة الرئيسية — `app/page.tsx`
-
-- زرار **🗺️ Trips** أول الفلاتر بلون دهبي مميز:
-  - غير نشط: `bg-[#c5a059]/10 border-[#c5a059]/30 text-[#c5a059]` (يلفت النظر)
-  - نشط: `bg-[#c5a059] text-black` (زي الباقي)
-- الفلتر `'all'` يستبعد `category === 'trip'`
-- فلتر `'trip'` يعرض فقط `category === 'trip'`
-- مفيش driver filter للمشاوير
-
-### 4️⃣ عرض Trips — Horizontal List (TripCard)
-
-**استايل مختلف** عن العربيات — كارد أفقي بالعرض:
-
-```
-┌──────────────────────────────────────────────┐
-│  ┌──────────┐  مشوار مطار القاهرة            │
-│  │  Image   │  🗺️ شبين الكوم → مطار القاهرة │
-│  │  (hover  │  توصيل مكيف ومريح...           │
-│  │  =>scale)│  500 EGP                       │
-│  │  ♥       │  [💬 WhatsApp] [📞 اتصل]      │
-│  └──────────┘  خلفية: أسود ثابت              │
-└──────────────────────────────────────────────┘
-```
-
-- **مفيش مودال** — كل التفاصيل ظاهرة في الكارد
-- الصورة تتكبر بالضغط عليها (lightbox)
-- خلفية `bg-[#0a0a0a]` — وضوح تام للنصوص
-- ألوان النص: أبيض صريح للاسم والسعر، `text-white/70` للوصف
-
-### 5️⃣ لوحة الأدمن — `app/admin/page.tsx`
-
-- إضافة قسم **Trips** جنب العربيات والورد
-- نفس نظام الـ AdCard (نشر/تعليق/تعديل/حذف)
-
-### 6️⃣ إعلاناتي — `app/my-ads/page.tsx`
-
-- عرض المشاوير مع أيقونة 🗺️
-- عرض المسار `من → إلى` بدل الموقع
-- EditModal: حقول من/إلى + مفيش تقويم + مفيش سواق
-
-## الملفات المعدلة
-
-| الملف | التغيير |
-|-------|---------|
-| `app/add-ad/page.tsx` | إضافة Trips option + from→to fields + navigation icon |
-| `app/page.tsx` | TripCard component + filter 'trip' + display logic + trips strip |
-| `app/admin/page.tsx` | إضافة قسم Trips مع counter + Navigation icon |
-| `app/my-ads/page.tsx` | عرض مسار المشاوير + EditModal يدعم trips |
-| `last-save.md` | توثيق التعديلات |
-
----
-
-# تحديث 19 مايو 2026 — v7.1: Fixes — موبايل TripCard + Lightbox X button
-
-## المشاكل
-- TripCard على الموبايل: النص والأزرار بتتقطع بسبب ضيق المساحة
-- Lightbox: زرار X مش باين (شفاف) وممكن يتغطى بالصورة
-
-## التعديلات — `app/page.tsx`
-
-### TripCard — تحسين الموبايل
-
-| العنصر | قبل | بعد |
-|-------|------|-----|
-| عرض الصورة | `w-[130px]` | `w-[95px]` |
-| ارتفاع الصورة | `min-h-[150px]` | `min-h-[120px]` |
-| Padding المحتوى | `p-4` | `p-2.5` |
-| اسم المشوار | `text-lg` | `text-sm` |
-| أيقونة القلب | `w-8 h-8` | `w-7 h-7` |
-| زرار واتساب/اتصال | `px-3 py-2 text-[8px]` | `px-2 py-1.5 text-[7px]` |
-| صف السعر + الأزرار | `flex justify-between` (جمب بعض) | `flex-col` موبايل — السعر فوق، الأزرار تحت |
-| الوصف | `text-[11px]` | `text-[10px]` |
-| المسافة بين العناصر | `mt-4` | `mt-2` |
-
-### Lightbox — زرار X واضح
-
-| قبل | بعد |
-|-----|------|
-| `bg-white/10` (شفاف — مش باين) | `bg-black/70 border border-white/30 shadow-lg` |
-| `top-6 right-6` | `top-4 right-4` |
-| `w-12 h-12` | `w-10 h-10` |
-| مفيش z-index محدد | `z-20` (فوق الصورة) |
-
-## الملفات المعدلة
-
-| الملف | التغيير |
-|-------|---------|
-| `app/page.tsx` | TripCard mobile layout + lightbox X button fix |
-| `last-save.md` | توثيق التعديلات |
+## 🤖 تعليمات للمطور التالي (AI/Agent)
+
+عند قراءة هذا الملف، افهم التالي:
+
+1. **النسخة الحالية v14.0** — آخر تعديل كان 1 يونيو 2026
+2. **Firebase rules** محدثة — المستخدمين المسجلين ينشروا، صاحب الإعلان يعدل، الأدمن يمسح
+3. **الـ Admin page** فيها فلاتر تصنيف (عربيات/باقات/ورد/مشاوير)
+4. **PWA icons** موجودة كـ SVG — للتوافق الكامل مع iOS Safari، الأفضل تتحول لـ PNG
+5. **الـ build يمر** (Turbopack) و TypeScript **صفر errors** + ESLint **صفر errors**
+6. **لو ضفت collection جديد** في Firestore، حدث `firestore.rules` وانشره
+7. **اتصال Firebase API key** عام (standard Firebase web SDK practice)
+8. **ملفات مهمة للتعديل**: `app/page.tsx` (الرئيسية)، `app/layout.tsx` (SEO)، `lib/translations.ts` (الترجمة — 722 سطر)، `firestore.rules` (القواعد)
+9. **Toast system**: `components/Toast.tsx` — `useToast()` hook متاح لكل الصفحات (استخدام: `const { toast } = useToast()`)
+10. **Location Picker**: `components/LocationPicker.tsx` — `<LocationPicker value={location} onChange={setLocation} />` (محافظة → مدينة)
+11. **تحذير مهم**: لو حصلت `Unexpected token }` أو `Expected ',' got 'ident'` في build، غالبًا مشكلة multiline string في JSX أو duplicate key في `translations.ts` — Turbopack حساس للـ newlines داخل strings

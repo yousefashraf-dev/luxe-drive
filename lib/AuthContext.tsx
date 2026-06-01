@@ -83,12 +83,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       await signInWithPopup(auth, provider);
-    } catch (err: any) {
-      console.error('Google sign-in error:', err.code || err, err.message || err);
-      if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+    } catch (err: unknown) {
+      const authErr = err as { code?: string; message?: string };
+      console.error('Google sign-in error:', authErr.code || err, authErr.message || err);
+      if (authErr.code === 'auth/popup-blocked' || authErr.code === 'auth/popup-closed-by-user') {
         await signInWithRedirect(auth, provider);
       } else {
-        throw err;
+        throw authErr;
       }
     }
   };
