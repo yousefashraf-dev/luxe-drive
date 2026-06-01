@@ -503,13 +503,14 @@ export default function Home() {
   }, [searchQuery, displayCars]);
 
   const handleSelectCar = (car: any) => {
+    document.body.style.overflow = 'hidden';
     const images = Array.isArray(car.image) ? car.image : car.image ? [car.image] : ['/placeholder-car.png'];
     setSelectedCar({ ...car, images });
     setCurrentImageIndex(0); setShowSuggestions(false); setIsClosing(false);
     updateDoc(doc(db, "cars", car.id), { views: increment(1) }).catch(() => {});
   };
 
-  const handleCloseModal = () => { setIsClosing(true); setTimeout(() => { setSelectedCar(null); setIsClosing(false); }, 300); };
+  const handleCloseModal = () => { document.body.style.overflow = ''; setIsClosing(true); setTimeout(() => { setSelectedCar(null); setIsClosing(false); }, 300); };
 
   /* ── Share inside modal ── */
   const handleShare = async () => {
@@ -788,7 +789,71 @@ export default function Home() {
                   />
                 ))}
               </div>
+            ) : activeFilter === 'all' ? (
+              /* ── Desktop: Sections (horizontal scroll per category) ── */
+              (() => {
+                const packages = displayCars.filter(c => c.category === 'car_package');
+                const weddingCars = displayCars.filter(c => c.category === 'car_wedding');
+                const rentalCars = displayCars.filter(c => c.category === 'car_rental');
+                const flowers = displayCars.filter(c => c.category === 'flowers' || c.bouquetName);
+                const trips = displayCars.filter(c => c.category === 'trip');
+                const sections = [
+                  { key: 'car_package', items: packages, label: t.filters.package },
+                  { key: 'car_wedding', items: weddingCars, label: t.filters.wedding },
+                  { key: 'car_rental', items: rentalCars, label: t.filters.rental },
+                  { key: 'flowers', items: flowers, label: t.filters.flowers },
+                  { key: 'trip', items: trips, label: t.filters.trips },
+                ];
+                return (
+                  <div className="space-y-16">
+                    {sections.map(s => s.items.length > 0 && (
+                      <div key={s.key}>
+                        <div className="flex items-center gap-4 mb-8">
+                          <h2 className="text-white/50 text-[10px] font-black uppercase tracking-[5px]">{s.label}</h2>
+                          <div className="h-px flex-1 bg-white/10" />
+                          <span className="text-white/20 text-[10px] font-mono">{s.items.length}</span>
+                        </div>
+                        <div className="relative group">
+                          <div className="flex gap-6 overflow-x-auto pb-4 scrollbar-none snap-x snap-mandatory"
+                            style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}>
+                            {s.items.map((car, idx) => (
+                              <div key={car.id} className="w-[380px] shrink-0 snap-start">
+                                <CarCard car={car} index={idx}
+                                  onClick={() => handleSelectCar(car)}
+                                  onShare={e => { e.stopPropagation(); shareCar(car); }}
+                                  isFavorited={favorites.includes(car.id)}
+                                  onToggleFavorite={(e) => { e.stopPropagation(); toggleFavorite(car.id); }}
+                                />
+                              </div>
+                            ))}
+                            <button onClick={(e) => {
+                              const p = (e.currentTarget.parentElement as HTMLElement);
+                              if (p) p.scrollBy({ left: dir === 'rtl' ? -400 : 400, behavior: 'smooth' });
+                            }}
+                              className="w-[50px] shrink-0 flex items-center justify-center text-white/20 hover:text-white/60 transition-all snap-start opacity-0 group-hover:opacity-100">
+                              <ChevronRight size={18} className={`transition-transform ${dir === 'rtl' ? 'rotate-180' : ''}`} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {(hasMore || loadingMore) && (
+                      <div ref={observerRef} className="flex justify-center py-12">
+                        {loadingMore ? (
+                          <div className="flex items-center gap-3 text-white/40">
+                            <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                            <span className="text-[10px] uppercase tracking-[3px]">{t.common.loading}</span>
+                          </div>
+                        ) : (
+                          <div className="w-6 h-6" />
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()
             ) : (
+              <>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-12">
                 {displayCars.map((car, index) => (
                   <CarCard key={car.id} car={car} index={index}
@@ -799,18 +864,19 @@ export default function Home() {
                   />
                 ))}
               </div>
-            )}
-            {(hasMore || loadingMore) && (
-              <div ref={observerRef} className="flex justify-center py-12">
-                {loadingMore ? (
-                  <div className="flex items-center gap-3 text-white/40">
-                    <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
-                    <span className="text-[10px] uppercase tracking-[3px]">{t.common.loading}</span>
-                  </div>
-                ) : (
-                  <div className="w-6 h-6" />
-                )}
-              </div>
+              {(hasMore || loadingMore) && (
+                <div ref={observerRef} className="flex justify-center py-12">
+                  {loadingMore ? (
+                    <div className="flex items-center gap-3 text-white/40">
+                      <div className="w-5 h-5 border-2 border-white/20 border-t-white/60 rounded-full animate-spin" />
+                      <span className="text-[10px] uppercase tracking-[3px]">{t.common.loading}</span>
+                    </div>
+                  ) : (
+                    <div className="w-6 h-6" />
+                  )}
+                </div>
+              )}
+              </>
             )}
             </>
           ) : (
@@ -967,7 +1033,7 @@ export default function Home() {
               )}
 
               {/* ── Smart Calendar ── */}
-              {selectedCar.category !== 'trip' && selectedCar.category !== 'car_package' && (() => {
+              {selectedCar.category !== 'trip' && selectedCar.category !== 'car_package' && selectedCar.category !== 'flowers' && (() => {
                 const now        = new Date();
                 const year       = now.getFullYear();
                 const month      = now.getMonth(); // 0-indexed
@@ -1261,10 +1327,11 @@ export default function Home() {
                               <><span className="text-white/40">{s.items.length}</span> — {s.label}</>
                             )}
                           </h3>
-                          <div className="flex gap-3 overflow-x-auto pb-2 px-4 -mx-4 scrollbar-none" style={{ WebkitOverflowScrolling: 'touch' }}>
+                          <div className="relative group">
+                            <div className="flex gap-3 overflow-x-auto pb-2 px-4 -mx-4 scrollbar-none snap-x snap-mandatory" style={{ WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth' }}>
                             {s.items.map(car => (
                               <div key={car.id} onClick={() => handleSelectCar(car)}
-                                className="relative w-[60vw] shrink-0 rounded-xl overflow-hidden border border-white/20 bg-white/10 active:scale-[0.97] transition-all">
+                                className="relative w-[60vw] shrink-0 snap-start rounded-xl overflow-hidden border border-white/20 bg-white/10 active:scale-[0.97] transition-all">
                                 <div className="relative h-32 w-full">
                                   <Image
                                     src={optimizeImage(Array.isArray(car.image) ? car.image[0] : car.image, 400)}
@@ -1324,6 +1391,14 @@ export default function Home() {
                                 </div>
                               </div>
                             ))}
+                              <button onClick={(e) => {
+                                const p = ((e.currentTarget.parentElement as HTMLElement)?.parentElement as HTMLElement)?.querySelector('.snap-x') as HTMLElement;
+                                if (p) p.scrollBy({ left: dir === 'rtl' ? -300 : 300, behavior: 'smooth' });
+                              }}
+                                className="w-[40px] shrink-0 flex items-center justify-center text-white/20 hover:text-white/60 transition-all snap-start">
+                                <ChevronRight size={16} className={`transition-transform ${dir === 'rtl' ? 'rotate-180' : ''}`} />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ))}

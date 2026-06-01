@@ -165,6 +165,17 @@ export default function LocationPicker({ value, onChange }: LocationPickerProps)
             <>
               <p className="text-[9px] font-black uppercase tracking-[3px] text-zinc-400 mb-3 px-1">{t.locations.selectCity}</p>
               <div className="grid grid-cols-2 gap-2">
+                <button key={selectedGov} type="button" onClick={() => handleSelectCity(selectedGov!)}
+                  className={`flex items-center gap-2 p-3.5 rounded-2xl border transition-all text-right col-span-2 ${
+                    value === selectedGov
+                      ? 'bg-black text-white border-black'
+                      : 'bg-black/5 text-black border-black/20 hover:bg-black/10'
+                  }`}>
+                  <MapPin size={14} className={value === selectedGov ? 'text-white' : 'text-zinc-500'} />
+                  <span className="text-[12px] font-bold">{selectedGov}</span>
+                  <span className="text-[9px] text-zinc-400 mr-auto">{t.locations.selectCity} (كل المنطقة)</span>
+                  {value === selectedGov && <Check size={14} className="mr-auto" />}
+                </button>
                 {(governorates[selectedGov] || []).map(city => (
                   <button key={city} type="button" onClick={() => handleSelectCity(city)}
                     className={`flex items-center gap-2 p-3.5 rounded-2xl border transition-all text-right ${
