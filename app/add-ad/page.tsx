@@ -451,12 +451,12 @@ function AddAdContent() {
                   placeholder={t.addAd.fields.descriptionPlaceholder} />
               </div>
 
-              {type === 'car' && (
+              {/* type === 'car' && (
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.bookedDays}</label>
                   <CalendarPicker bookedDays={bookedDays} onToggle={handleToggleDay} />
                 </div>
-              )}
+              ) */}
 
                 <div>
                   <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400 mr-2 block mb-2">{t.addAd.fields.images}</label>

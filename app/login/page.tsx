@@ -44,7 +44,7 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         <div className="p-10 bg-zinc-900/80 backdrop-blur-xl rounded-[3rem] shadow-2xl border border-white/5 space-y-8">
           <div className="text-center">
-            <h1 className="font-serif text-4xl italic text-white tracking-tight">ZaFah</h1>
+            <h1 className="font-serif text-4xl italic text-white tracking-tight">JOY DRIVE</h1>
             <p className="text-[8px] tracking-[0.7em] text-zinc-500 uppercase mt-2">{t.login.adminAccess}</p>
             <div className="h-[1px] w-12 bg-white/10 mx-auto mt-6" />
           </div>

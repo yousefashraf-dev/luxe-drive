@@ -1,6 +1,6 @@
 const translations = {
   ar: {
-    brand: 'ZaFah',
+    brand: 'JOY DRIVE',
     // Nav
     nav: {
       search: 'ابحث في الأسطول...',
@@ -371,7 +371,7 @@ const translations = {
   },
 
   en: {
-    brand: 'ZaFah',
+    brand: 'JOY DRIVE',
     // Nav
     nav: {
       search: 'Search fleet...',
@@ -417,7 +417,7 @@ const translations = {
     // Car card
     carCard: {
       vip: 'VIP',
-      vipChoice: 'VIP Choice',
+      vipChoice: 'VIP',
       activeFleet: 'Active Fleet',
       package: 'Package',
       flowers: 'Flowers',

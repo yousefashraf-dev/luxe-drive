@@ -18,7 +18,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     startTransition(() => setMounted(true));
-    const saved = localStorage.getItem('zafah_lang') as Lang | null;
+    const saved = localStorage.getItem('joydrive_lang') as Lang | null;
     if (saved === 'ar' || saved === 'en') {
       startTransition(() => setLangState(saved));
     }
@@ -26,7 +26,7 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   const setLang = useCallback((newLang: Lang) => {
     setLangState(newLang);
-    try { localStorage.setItem('zafah_lang', newLang); } catch {}
+    try { localStorage.setItem('joydrive_lang', newLang); } catch {}
   }, []);
 
   const toggleLang = useCallback(() => {

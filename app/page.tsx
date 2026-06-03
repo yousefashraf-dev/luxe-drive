@@ -32,8 +32,8 @@ function getOS(): 'ios' | 'android' | 'other' {
 /* ─── Share helper ─── */
 async function shareCar(car: any) {
   const url   = `${window.location.origin}?car=${car.id}`;
-  const title = `${car.name} — ZaFah Luxury Rental`;
-  const text  = `${car.name} متاحة للإيجار بسعر ${formatPrice(car.price)} EGP / يوم 🚗`;
+  const title = `${car.name} — JOY DRIVE`;
+  const text  = `${car.name} — JOY DRIVE`;
   if (navigator.share) {
     try { await navigator.share({ title, text, url }); } catch (_) {}
   } else {
@@ -219,7 +219,7 @@ export default function Home() {
   const [favorites, setFavorites] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const stored = localStorage.getItem('zafah_favorites');
+        const stored = localStorage.getItem('joydrive_favorites');
         return stored ? JSON.parse(stored) : [];
       } catch {}
     }
@@ -237,7 +237,7 @@ export default function Home() {
     if (!user) return;
     const migrateAndFetch = async () => {
       try {
-        const localRaw = localStorage.getItem('zafah_favorites');
+        const localRaw = localStorage.getItem('joydrive_favorites');
         const localFavs = localRaw ? JSON.parse(localRaw) : [];
         const q = query(collection(db, 'favorites'), where('userId', '==', user.uid));
         const snap = await getDocs(q);
@@ -252,7 +252,7 @@ export default function Home() {
             })
           ));
         }
-        localStorage.removeItem('zafah_favorites');
+        localStorage.removeItem('joydrive_favorites');
       } catch (err) { console.error('Favorites sync error:', err); }
     };
     migrateAndFetch();
@@ -263,7 +263,7 @@ export default function Home() {
     setFavorites(prev => {
       const updated = isFav ? prev.filter(id => id !== carId) : prev.includes(carId) ? prev : [...prev, carId];
       if (!user) {
-        try { localStorage.setItem('zafah_favorites', JSON.stringify(updated)); } catch {}
+        try { localStorage.setItem('joydrive_favorites', JSON.stringify(updated)); } catch {}
       }
       return updated;
     });
@@ -294,9 +294,13 @@ export default function Home() {
     }
 
     // Filter by category
-    if (activeFilter === 'flowers' && car.category !== 'flowers' && !car.bouquetName) return false;
+    if (activeFilter === 'flowers') {
+      if (car.category !== 'flowers' && car.category !== 'car_wedding' && !car.bouquetName) return false;
+    }
     if (activeFilter === 'trip' && car.category !== 'trip') return false;
-    if (activeFilter === 'wedding' && car.category !== 'car_wedding') return false;
+    if (activeFilter === 'wedding') {
+      if (car.category !== 'car_wedding' && car.category !== 'flowers') return false;
+    }
     if (activeFilter === 'rental' && car.category !== 'car_rental') return false;
     if (activeFilter === 'package' && car.category !== 'car_package') return false;
     // 'all' shows everything — no exclusion
@@ -398,6 +402,7 @@ export default function Home() {
   const lastDocRef = useRef<any>(null);
   const observerRef = useRef<HTMLDivElement>(null);
   const mobileObserverRef = useRef<HTMLDivElement>(null);
+  const touchStartXRef = useRef(0);
   const PAGE_SIZE = 6;
 
   const sortFn = (a: any, b: any) => {
@@ -545,7 +550,7 @@ export default function Home() {
       <nav className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a] text-white px-6 md:px-12 py-5 hidden md:flex justify-between items-center border-b border-white/5 shadow-2xl">
         <div className="flex-1 flex flex-col items-start cursor-default group">
           <div className="relative">
-            <span className="font-serif text-2xl font-bold text-white tracking-tight transition-all duration-700 group-hover:text-[#c5a059]">ZaFah</span>
+            <span className="font-serif text-2xl font-bold text-white tracking-tight transition-all duration-700 group-hover:text-[#c5a059]">JOY DRIVE</span>
             <div className="absolute -bottom-1 left-0 h-[1px] w-0 bg-[#c5a059] transition-all duration-700 group-hover:w-full" />
           </div>
         </div>
@@ -619,7 +624,7 @@ export default function Home() {
           {/* Language Toggle - Desktop */}
           <button
             onClick={toggleLang}
-            className="w-10 h-10 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all text-[11px] font-bold tracking-widest"
+            className="w-8 h-8 rounded-full bg-white/10 border border-white/20 flex items-center justify-center hover:bg-white/20 transition-all text-[9px] font-bold tracking-widest"
             title={lang === 'ar' ? 'العربية (اضغط للتغيير)' : 'English (click to change)'}
           >
             {lang === 'ar' ? 'AR' : 'EN'}
@@ -706,16 +711,14 @@ export default function Home() {
               { key: 'rental', label: t.filters.rental, icon: null },
               { key: 'package', label: t.filters.package, icon: null, gold: true },
               { key: 'flowers', label: t.filters.flowers, icon: null },
-              { key: 'favorites', label: `❤️ ${t.filters.favorites} (${cars.filter(c => favorites.includes(c.id)).length})`, icon: null },
+              { key: 'favorites', label: `${t.filters.favorites} (${cars.filter(c => favorites.includes(c.id)).length})`, icon: null },
             ].map(f => (
               <button key={f.key} onClick={() => setActiveFilter(f.key as any)}
-                className={`px-5 py-2.5 rounded-full text-[10px] font-bold uppercase tracking-[2px] transition-all border ${
+                className={`px-5 py-2.5 rounded-full text-[9px] font-bold uppercase tracking-[2px] transition-all border ${
                   activeFilter === f.key
-                    ? 'bg-[#c5a059] text-black border-[#c5a059] shadow-lg'
-                    : f.gold
-                      ? 'bg-[#c5a059]/10 text-[#c5a059] border-[#c5a059]/30 hover:bg-[#c5a059]/20'
-                      : 'bg-white/10 text-white/60 border-white/10 hover:bg-white/20 hover:text-white'
-                }`}>
+                    ? 'bg-white/20 text-white border-white/30 shadow-lg'
+                    : 'bg-transparent text-white/40 border-white/10 hover:text-white/60'
+                } ${f.gold ? 'ring-1 ring-[#c5a059]/30' : ''}`}>
                 {f.label}
               </button>
             ))}
@@ -910,14 +913,13 @@ export default function Home() {
 
             {/* ── Image panel ── */}
             <div className="relative bg-zinc-900 flex-shrink-0 h-[48vw] min-h-[200px] max-h-[280px] md:h-auto md:w-3/5 md:max-h-[88vh]"
-              onTouchStart={e => { (window as any)._touchStartX = e.touches[0].clientX; }}
+              onTouchStart={e => { touchStartXRef.current = e.touches[0].clientX; }}
               onTouchEnd={e => {
-                const diff = (window as any)._touchStartX - e.changedTouches[0].clientX;
+                const diff = touchStartXRef.current - e.changedTouches[0].clientX;
                 if (Math.abs(diff) > 50) {
                   if (diff > 0) setCurrentImageIndex(p => (p + 1) % selectedCar.images.length);
                   else setCurrentImageIndex(p => (p - 1 + selectedCar.images.length) % selectedCar.images.length);
                 }
-                delete (window as any)._touchStartX;
               }}>
               <Image
                 src={optimizeImage(selectedCar.images[currentImageIndex], 800)}
@@ -1032,69 +1034,9 @@ export default function Home() {
                 </div>
               )}
 
-              {/* ── Smart Calendar ── */}
-              {selectedCar.category !== 'trip' && selectedCar.category !== 'car_package' && selectedCar.category !== 'flowers' && (() => {
-                const now        = new Date();
-                const year       = now.getFullYear();
-                const month      = now.getMonth(); // 0-indexed
-                const today      = now.getDate();
-                const firstDay   = new Date(year, month, 1).getDay(); // 0=Sun
-                const daysInMonth = new Date(year, month + 1, 0).getDate();
-                const monthNames = t.calendar.monthNames;
-
-                // خلايا فاضية قبل أول يوم في الشهر
-                const blanks = Array.from({ length: firstDay });
-                const days   = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-
-                return (
-                  <div className="mt-5 bg-white rounded-[1.2rem] border border-zinc-200 shadow-sm p-4 md:p-6">
-                    {/* Header */}
-                    <p className="text-[8px] font-black uppercase tracking-[5px] text-center text-zinc-400 mb-1">
-                      {t.detail.availability}
-                    </p>
-                    {/* Month + Year */}
-                    <p className="text-[13px] font-extrabold text-center text-black mb-1">
-                      {monthNames[month]} {year}
-                    </p>
-                    <p className="text-[11px] text-center text-red-500 font-bold mb-4">
-                      {t.detail.bookedDays}
-                    </p>
-
-                    {/* Day headers */}
-                    <div className="grid grid-cols-7 gap-1 mb-2">
-                      {[t.calendar.su, t.calendar.mo, t.calendar.tu, t.calendar.we, t.calendar.th, t.calendar.fr, t.calendar.sa].map(d => (
-                        <div key={d} className="text-[7px] font-black uppercase text-zinc-300 text-center">{d}</div>
-                      ))}
-                    </div>
-
-                    {/* Days grid */}
-                    <div className="grid grid-cols-7 gap-1 text-center">
-                      {/* blank cells */}
-                      {blanks.map((_, i) => <div key={`b${i}`} />)}
-
-                      {/* actual days */}
-                      {days.map(day => {
-                        const booked  = selectedCar.bookedDays?.includes(day);
-                        const isToday = day === today;
-                        return (
-                          <div key={day} className="flex items-center justify-center">
-                            <span className={`
-                              text-[11px] w-7 h-7 flex items-center justify-center rounded-full font-bold transition-all duration-200
-                              ${booked
-                                ? 'bg-red-500 text-white shadow-[0_0_10px_rgba(239,68,68,0.4)]'
-                                : isToday
-                                  ? 'bg-black text-white font-bold'
-                                  : 'text-zinc-600'
-                              }
-                            `}>
-                              {day}
-                            </span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                );
+              {/* ── Smart Calendar (معلق) ── */}
+              {false && (() => {
+                return <div />;
               })()}
 
               {/* CTA */}
@@ -1138,7 +1080,7 @@ export default function Home() {
         {/* Mobile Header */}
         <div className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a]/95 backdrop-blur-xl border-b border-white/10 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="font-serif text-lg font-bold text-white tracking-tight">ZaFah</span>
+            <span className="font-serif text-lg font-bold text-white tracking-tight">JOY DRIVE</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="relative">
@@ -1239,7 +1181,7 @@ export default function Home() {
                   { key: 'package', label: t.filters.package },
                   { key: 'flowers', label: t.filters.flowers },
                   { key: 'trip', label: t.filters.trips },
-                  { key: 'favorites', label: `❤️ ${t.filters.favorites} (${cars.filter(c => favorites.includes(c.id)).length})` },
+                  { key: 'favorites', label: `${t.filters.favorites} (${cars.filter(c => favorites.includes(c.id)).length})` },
                 ].map(f => (
                   <button key={f.key} onClick={() => setActiveFilter(f.key as any)}
                     className={`whitespace-nowrap px-4 py-2 rounded-full text-[10px] font-bold transition-all border shrink-0 ${
@@ -1440,8 +1382,7 @@ export default function Home() {
                           {car.category === 'car_wedding' ? t.filters.wedding : car.category === 'car_rental' ? t.filters.rental : car.category === 'flowers' ? t.filters.flowers : car.category === 'trip' ? t.filters.trips : car.category === 'car_package' ? t.filters.package : ''}
                         </p>
                         <h3 className="text-xs font-bold text-white leading-tight truncate">{car.name}</h3>
-                        <p className="text-sm font-extrabold text-white mt-1">{formatPrice(car.price)} <span className="text-[7px] text-zinc-400">{t.carCard.egp}</span></p>
-                        <div className="flex gap-1.5 mt-2">
+                        <div className="flex gap-1.5 mt-1">
                           <a href={`https://wa.me/${car.whatsapp || car.phone || myWhatsAppNumber}?text=${encodeURIComponent(t.chat.inquiry + car.name)}`}
                             onClick={e => e.stopPropagation()}
                             className="bg-[#25D366] p-1.5 rounded-full flex-1 flex items-center justify-center gap-1">
@@ -1485,7 +1426,7 @@ export default function Home() {
           {/* Favorites Tab */}
           {mobileTab === 'favorites' && (
             <div className="px-4 pb-6">
-              <h2 className="font-serif text-lg italic text-white mb-4">{t.mobileNav.favorites} ❤️</h2>
+              <h2 className="font-serif text-lg italic text-white mb-4">{t.mobileNav.favorites}</h2>
               {cars.filter(c => favorites.includes(c.id) && c.status === 'active').length > 0 ? (
                 <div className="space-y-4">
                   {cars.filter(c => favorites.includes(c.id) && c.status === 'active').map(car => (
@@ -1496,12 +1437,23 @@ export default function Home() {
                           alt={car.name} fill unoptimized className="object-cover" />
                       </div>
                       <div className="flex-1 p-3 flex items-center justify-between">
-                        <div>
-                          <h3 className="text-sm font-extrabold text-white">{car.name}</h3>
-                          <p className="text-xs font-extrabold text-white mt-0.5">{formatPrice(car.price)} <span className="text-[8px] text-zinc-400">{t.carCard.egp}</span></p>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-sm font-extrabold text-white truncate">{car.name}</h3>
+                          <div className="flex gap-1 mt-1.5">
+                            <a href={`https://wa.me/${car.whatsapp || car.phone || myWhatsAppNumber}?text=${encodeURIComponent(t.chat.inquiry + car.name)}`}
+                              onClick={e => e.stopPropagation()}
+                              className="bg-[#25D366] p-1 rounded-full flex items-center justify-center">
+                              <MessageCircle size={9} className="text-white" />
+                            </a>
+                            <a href={`tel:+${car.phone || car.whatsapp || myWhatsAppNumber}`}
+                              onClick={e => e.stopPropagation()}
+                              className="bg-white/20 p-1 rounded-full flex items-center justify-center">
+                              <Phone size={9} className="text-white" />
+                            </a>
+                          </div>
                         </div>
                         <button onClick={e => { e.stopPropagation(); toggleFavorite(car.id); }}
-                          className="w-7 h-7 rounded-full bg-red-500/20 flex items-center justify-center">
+                          className="w-7 h-7 rounded-full bg-red-500/20 flex items-center justify-center shrink-0">
                           <Heart size={11} className="text-red-400 fill-red-400" />
                         </button>
                       </div>
@@ -1697,6 +1649,7 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
   isFavorited?: boolean; onToggleFavorite?: (e: React.MouseEvent) => void;
 }) {
   const { t } = useLanguage();
+  const myWhatsAppNumber = "201095976766";
   return (
     <div className="group relative cursor-pointer" onClick={onClick}>
       <div className="absolute -inset-1 rounded-[2rem] bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none" />
@@ -1762,20 +1715,25 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
           <div className="absolute bottom-0 left-0 right-0 p-5 md:p-6">
             <h3 className="text-xl md:text-2xl font-extrabold text-white leading-tight tracking-tight">{car.name}</h3>
             <p className="text-[8px] text-white/50 uppercase tracking-[4px] font-bold mt-1">
-              {car.category === 'car_package' ? `📦 ${car.packageDetails?.split('\n').filter((l: string) => l.trim()).length || 0} ${t.carCard.cars}` : car.category === 'flowers' ? t.carCard.flowerBouquet : car.category === 'trip' ? t.carCard.tripService : t.carCard.premiumClass}
+              {car.category === 'car_package' ? `${car.packageDetails?.split('\n').filter((l: string) => l.trim()).length || 0} ${t.carCard.cars}` : car.category === 'flowers' ? t.carCard.flowerBouquet : car.category === 'trip' ? t.carCard.tripService : t.carCard.premiumClass}
             </p>
           </div>
         </div>
 
-          {/* Price strip */}
+          {/* Contact strip */}
         <div className="flex items-center justify-between px-5 md:px-6 py-4 md:py-5 bg-black/60 backdrop-blur-sm">
-          <div>
-            <p className="text-[9px] text-white/60 uppercase tracking-[3px] font-bold">
-              {car.category === 'car_rental' ? t.carCard.perDay : car.category === 'car_package' ? t.carCard.package : car.category === 'flowers' ? t.carCard.price : car.category === 'trip' ? t.carCard.trip : t.carCard.perDay}
-            </p>
-            <p className="text-xl md:text-2xl font-extrabold text-white mt-0.5">
-              {formatPrice(car.price)} <span className="text-[11px] text-white/60 font-bold">{t.carCard.egp}</span>
-            </p>
+          <div className="flex items-center gap-2">
+            <a href={`https://wa.me/${car.whatsapp || car.phone || myWhatsAppNumber}?text=${encodeURIComponent(t.chat.inquiry + car.name)}`}
+              target="_blank" rel="noopener noreferrer"
+              onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1.5 bg-[#25D366] text-white px-3 py-2 rounded-xl text-[8px] font-bold uppercase tracking-[1px] hover:opacity-90 transition-all active:scale-95">
+              <MessageCircle size={11} /> {t.detail.whatsapp}
+            </a>
+            <a href={`tel:+${car.phone || car.whatsapp || myWhatsAppNumber}`}
+              onClick={e => e.stopPropagation()}
+              className="flex items-center gap-1.5 bg-white/10 text-white px-3 py-2 rounded-xl text-[8px] font-bold uppercase tracking-[1px] hover:bg-white/20 transition-all active:scale-95 border border-white/10">
+              <Phone size={11} /> {t.detail.call}
+            </a>
           </div>
           <div className="flex items-center gap-2 bg-white/10 active:bg-white hover:bg-white group/btn rounded-2xl px-5 py-3 border border-white/20 transition-all duration-300">
             <span className="text-[10px] font-extrabold uppercase tracking-[3px] text-white group-hover/btn:text-black transition-colors">{t.carCard.view}</span>
@@ -1833,7 +1791,7 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
               </h3>
               {(trip.fromLocation || trip.toLocation) && (
                 <p className="text-indigo-300/80 text-[9px] md:text-[12px] mt-0.5 md:mt-1">
-                  🗺️ <span dir="ltr">{trip.fromLocation || '...'} → {trip.toLocation || '...'}</span>
+                  <span dir="ltr">{trip.fromLocation || '...'} → {trip.toLocation || '...'}</span>
                 </p>
               )}
               {trip.description && (
@@ -1844,24 +1802,21 @@ function TripCard({ trip, index = 0, isFavorited, onToggleFavorite }: {
             </div>
 
             <div className="flex md:items-center justify-between mt-2 md:mt-5 gap-1.5 md:gap-0 flex-col md:flex-row">
-                <p className="text-sm md:text-2xl font-extrabold text-white order-2 md:order-1">
-                  {formatPrice(trip.price)} <span className="text-[8px] md:text-[11px] text-zinc-400 font-bold">{t.carCard.egp}</span>
-                </p>
-              <div className="flex gap-1.5 order-1 md:order-2">
-                <a href={`https://wa.me/${trip.whatsapp || trip.phone || myWhatsAppNumber}?text=${encodeURIComponent(t.chat.inquiryTrip + trip.name)}`}
-                  target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 bg-[#25D366] text-white px-2 md:px-5 py-1.5 md:py-2.5 rounded-full text-[7px] md:text-[10px] font-bold uppercase tracking-wider hover:bg-[#20bd5a] transition-all active:scale-95 shadow-md">
-                  <MessageCircle size={10} /> {t.detail.whatsapp}
-                </a>
-                <a href={`tel:+${trip.phone || trip.whatsapp || myWhatsAppNumber}`}
-                  className="flex items-center gap-1 bg-white/10 text-white px-2 md:px-5 py-1.5 md:py-2.5 rounded-full text-[7px] md:text-[10px] font-bold uppercase tracking-wider hover:bg-white/20 transition-all active:scale-95 shadow-md border border-white/10">
-                  <Phone size={10} /> {t.detail.call}
-                </a>
-              </div>
+                <div className="flex gap-1.5 order-2 md:order-1">
+                  <a href={`https://wa.me/${trip.whatsapp || trip.phone || myWhatsAppNumber}?text=${encodeURIComponent(t.chat.inquiryTrip + trip.name)}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-1 bg-[#25D366] text-white px-2 md:px-3 py-1.5 md:py-2 rounded-full text-[7px] md:text-[9px] font-bold uppercase tracking-wider hover:bg-[#20bd5a] transition-all active:scale-95 shadow-md">
+                    <MessageCircle size={9} /> {t.detail.whatsapp}
+                  </a>
+                  <a href={`tel:+${trip.phone || trip.whatsapp || myWhatsAppNumber}`}
+                    className="flex items-center gap-1 bg-white/10 text-white px-2 md:px-3 py-1.5 md:py-2 rounded-full text-[7px] md:text-[9px] font-bold uppercase tracking-wider hover:bg-white/20 transition-all active:scale-95 border border-white/10">
+                    <Phone size={9} /> {t.detail.call}
+                  </a>
             </div>
           </div>
         </div>
       </div>
+    </div>
 
     </>
   );
