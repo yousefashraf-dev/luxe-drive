@@ -20,6 +20,11 @@ function formatPrice(price: string | number): string {
   return Number(price).toLocaleString('ar-EG');
 }
 
+/* ─── Show price only for non-car categories ─── */
+function shouldShowPrice(car: any): boolean {
+  return car.category === 'car_package' || car.category === 'flowers' || car.category === 'trip' || car.bouquetName;
+}
+
 /* ─── detect iOS / Android ─── */
 function getOS(): 'ios' | 'android' | 'other' {
   if (typeof navigator === 'undefined') return 'other';
@@ -313,24 +318,43 @@ export default function Home() {
     const search = (searchQuery || "").toLowerCase().trim();
     if (!search) return true;
     const carName = (car.name || "").toLowerCase();
+    const carDesc = (car.description || "").toLowerCase();
 
+    // Exact or partial match in name / description
     if (carName.includes(search)) return true;
+    if (carDesc.includes(search)) return true;
 
+    // First letter match: "b" → BMW, "m" → Mercedes
+    const searchFirst = search[0];
+    if (carName.startsWith(searchFirst) || carName.split(' ').some((w: string) => w.startsWith(search))) return true;
+
+    // Model → brand mapping (e.g. "النترا" / "elantra" → Hyundai)
     const match = modelInfo[search];
     if (match) {
       if (carName.includes(match.brand)) return true;
       if (carName.includes(match.en)) return true;
     }
 
+    // Partial model match (e.g. "النت" → "النترا" → Hyundai)
+    const partialModel = Object.entries(modelInfo).find(
+      ([key]) => key.includes(search) || search.includes(key)
+    );
+    if (partialModel) {
+      if (carName.includes(partialModel[1].brand)) return true;
+      if (carName.includes(partialModel[1].en)) return true;
+    }
+
+    // Arabic brand partial match (e.g. "بي" → BMW, "هيو" → Hyundai)
     const arabicBrands: Record<string, string> = {
       'بي ام': 'bmw', 'مرسيدس': 'mercedes', 'بورشه': 'porsche', 'تويوتا': 'toyota',
       'نيسان': 'nissan', 'هيونداي': 'hyundai', 'هوندا': 'honda', 'بيجو': 'peugeot',
       'ميتسوبيشي': 'mitsubishi', 'رنج روفر': 'range rover', 'رانج روفر': 'range rover',
       'شيفروليه': 'chevrolet', 'كيا': 'kia', 'رينو': 'renault',
     };
-    return Object.entries(arabicBrands).some(
-      ([ar, en]) => ar.includes(search) && carName.includes(en)
+    const brandMatch = Object.entries(arabicBrands).find(
+      ([ar]) => ar.includes(search) || search.includes(ar)
     );
+    if (brandMatch) return carName.includes(brandMatch[1]);
   }), [cars, activeFilter, driverFilter, favorites, searchQuery]);
 
   /* ── scroll (throttled) + outside-click ── */
@@ -508,14 +532,19 @@ export default function Home() {
   }, [searchQuery, displayCars]);
 
   const handleSelectCar = (car: any) => {
-    document.body.style.overflow = 'hidden';
     const images = Array.isArray(car.image) ? car.image : car.image ? [car.image] : ['/placeholder-car.png'];
     setSelectedCar({ ...car, images });
     setCurrentImageIndex(0); setShowSuggestions(false); setIsClosing(false);
     updateDoc(doc(db, "cars", car.id), { views: increment(1) }).catch(() => {});
   };
 
-  const handleCloseModal = () => { document.body.style.overflow = ''; setIsClosing(true); setTimeout(() => { setSelectedCar(null); setIsClosing(false); }, 300); };
+  const handleCloseModal = () => { setIsClosing(true); setTimeout(() => { setSelectedCar(null); setIsClosing(false); }, 300); };
+
+  useEffect(() => {
+    if (selectedCar) document.body.style.overflow = 'hidden';
+    else document.body.style.overflow = '';
+    return () => { document.body.style.overflow = ''; };
+  }, [selectedCar]);
 
   /* ── Share inside modal ── */
   const handleShare = async () => {
@@ -549,7 +578,14 @@ export default function Home() {
       {/* ════ NAV ════ */}
       <nav className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a] text-white px-6 md:px-12 py-5 hidden md:flex justify-between items-center border-b border-white/5 shadow-2xl">
         <div className="flex-1 flex flex-col items-start cursor-default group">
-          <div className="relative">
+          <div className="relative flex items-center gap-3">
+            <div className="w-8 h-8 md:w-10 md:h-10 flex-shrink-0 overflow-hidden">
+              <img
+                src="/joydrive-logo.svg"
+                alt="JOY DRIVE"
+                className="w-full h-full object-contain"
+              />
+            </div>
             <span className="font-serif text-2xl font-bold text-white tracking-tight transition-all duration-700 group-hover:text-[#c5a059]">JOY DRIVE</span>
             <div className="absolute -bottom-1 left-0 h-[1px] w-0 bg-[#c5a059] transition-all duration-700 group-hover:w-full" />
           </div>
@@ -574,7 +610,11 @@ export default function Home() {
                   className="px-5 py-3 hover:bg-zinc-50 cursor-pointer flex justify-between items-center border-b border-zinc-50 last:border-none"
                 >
                   <span className="text-[11px] font-medium">{car.name}</span>
-                   <span className="text-[9px] opacity-40 uppercase tracking-widest">{formatPrice(car.price)} {t.carCard.egp}</span>
+                   {shouldShowPrice(car) ? (
+                     <span className="text-[9px] opacity-40 uppercase tracking-widest">{formatPrice(car.price)} {t.carCard.egp}</span>
+                   ) : (
+                     <span className="text-[7px] opacity-30 uppercase tracking-[2px]">{t.detail.contactPrice}</span>
+                   )}
                 </div>
               ))}
             </div>
@@ -931,6 +971,22 @@ export default function Home() {
                 draggable={false}
                 onClick={() => setZoomedImage(selectedCar.images[currentImageIndex])}
               />
+              {/* ── VIP badge on modal image ── */}
+              {(selectedCar.isVIP === true || selectedCar.isVIP === 'true') && (
+                <div className="absolute top-4 left-4 z-10 bg-[#D4AF37] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-lg shadow-[#D4AF37]/40">
+                  <Star size={10} fill="white" stroke="none" />
+                  <span className="text-[8px] font-black tracking-[2px] uppercase">{t.carCard.vip}</span>
+                </div>
+              )}
+              {/* ── Share button circle on image ── */}
+              <button onClick={handleShare}
+                className="absolute top-4 right-16 z-10 w-10 h-10 rounded-full bg-black/50 backdrop-blur-md border border-white/30 flex items-center justify-center hover:bg-black/70 active:scale-90 transition-all duration-300 shadow-lg"
+                title={t.detail.shareTooltip}>
+                {copied
+                  ? <Check size={14} className="text-green-400" />
+                  : <Share2 size={14} className="text-white" />
+                }
+              </button>
               <div className="absolute bottom-3 right-3 bg-black/50 backdrop-blur-sm text-white rounded-full px-3 py-1 flex items-center gap-1.5 pointer-events-none">
                 <ZoomIn size={11} />
                 <span className="text-[8px] tracking-widest"> </span>
@@ -971,27 +1027,16 @@ export default function Home() {
                   {selectedCar.category === 'trip' ? t.detail.tripService : t.detail.premiumClass}
                 </p>
 
-                {/* ── Share button — تحت الاسم مباشرة ── */}
-                <button
-                  onClick={handleShare}
-                  className="mt-4 flex items-center gap-2 bg-black text-white pl-4 pr-5 py-2.5 rounded-full shadow-md hover:bg-zinc-800 active:scale-95 transition-all duration-300 group"
-                  title={t.detail.shareTooltip}
-                >
-                  {copied
-                    ? <Check size={14} className="text-green-400" />
-                    : <Share2 size={14} className="text-white" />
-                  }
-                  <span className="text-[10px] font-bold uppercase tracking-[2px]">
-                    {copied ? t.detail.copied : t.detail.share}
-                  </span>
-                </button>
+
               </div>
 
               {/* Description */}
               {selectedCar.description && (
-                <p className="text-zinc-600 text-sm leading-relaxed text-right font-medium italic mt-4 md:mt-6 border-r-2 border-zinc-300 pr-4" dir="rtl">
-                  {selectedCar.description}
-                </p>
+                <div className="mt-5 bg-white/80 backdrop-blur-sm rounded-2xl border border-zinc-200/60 shadow-sm p-5" dir={dir}>
+                  <p className="text-zinc-600 text-sm leading-relaxed font-medium">
+                    {selectedCar.description}
+                  </p>
+                </div>
               )}
 
               {/* ── Trip route info ── */}
@@ -1040,7 +1085,7 @@ export default function Home() {
               })()}
 
               {/* CTA */}
-              <div className="mt-5 flex gap-3 md:relative md:mt-5 md:bg-transparent md:p-0 sticky bottom-0 bg-[#F5F4F1] pt-4 pb-3 -mx-5 px-5 md:mx-0 md:px-0 md:pt-0 md:pb-0 md:sticky-none">
+              <div className="mt-5 flex gap-3 md:relative md:mt-5 md:bg-transparent md:p-0 sticky bottom-0 bg-[#F5F4F1] pt-4 pb-3 -mx-5 px-5 md:mx-0 md:px-0 md:pt-0 md:pb-0 md:static z-10">
                 <a href={`https://wa.me/${selectedCar.whatsapp || selectedCar.phone || myWhatsAppNumber}?text=${encodeURIComponent(t.chat.inquiry + selectedCar.name)}`} target="_blank"
                   className="flex-1 flex items-center justify-center gap-2 bg-[#25D366] text-white py-4 rounded-2xl text-[10px] font-bold uppercase tracking-[2px] shadow-lg active:scale-95 transition-all">
                   <MessageCircle size={16} /> {t.detail.whatsapp}
@@ -1080,6 +1125,13 @@ export default function Home() {
         {/* Mobile Header */}
         <div className="fixed top-0 left-0 right-0 z-[100] bg-[#0a0a0a]/95 backdrop-blur-xl border-b border-white/10 px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
+            <div className="w-7 h-7 flex-shrink-0 overflow-hidden">
+              <img
+                src="/joydrive-logo.svg"
+                alt="JOY DRIVE"
+                className="w-full h-full object-contain"
+              />
+            </div>
             <span className="font-serif text-lg font-bold text-white tracking-tight">JOY DRIVE</span>
           </div>
           <div className="flex items-center gap-2">
@@ -1309,7 +1361,11 @@ export default function Home() {
                                       </p>
                                       <h3 className="text-sm font-bold text-white leading-tight truncate">{car.name}</h3>
                                       <div className="flex items-center justify-between mt-2">
-                                        <p className="text-sm font-extrabold text-white">{formatPrice(car.price)} <span className="text-[7px] text-zinc-400">{t.carCard.egp}</span></p>
+                                        {shouldShowPrice(car) ? (
+                                          <p className="text-sm font-extrabold text-white">{formatPrice(car.price)} <span className="text-[7px] text-zinc-400">{t.carCard.egp}</span></p>
+                                        ) : (
+                                          <p className="text-[7px] text-white/40 leading-tight">{t.detail.contactPrice}</p>
+                                        )}
                                         <div className="flex gap-1">
                                           <a href={`https://wa.me/${car.whatsapp || car.phone || myWhatsAppNumber}?text=${encodeURIComponent(t.chat.inquiry + car.name)}`}
                                             onClick={e => e.stopPropagation()}
@@ -1650,10 +1706,12 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
 }) {
   const { t } = useLanguage();
   const myWhatsAppNumber = "201095976766";
+  const isVIP = car.isVIP === true || car.isVIP === 'true';
   return (
     <div className="group relative cursor-pointer" onClick={onClick}>
-      <div className="absolute -inset-1 rounded-[2rem] bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none" />
-      <div className="relative rounded-[2rem] overflow-hidden border border-white/20 backdrop-blur-md bg-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.35)] group-hover:shadow-[0_20px_60px_rgba(0,0,0,0.55)] transition-all duration-500 group-hover:-translate-y-1 active:scale-[0.98]">
+      {isVIP && <div className="absolute -inset-2 rounded-[2.5rem] bg-[#D4AF37]/30 blur-2xl opacity-70 animate-pulse pointer-events-none" />}
+      <div className={`absolute -inset-1 rounded-[2rem] bg-white/10 blur-xl opacity-0 group-hover:opacity-100 transition-all duration-700 pointer-events-none ${isVIP ? '!opacity-100 !bg-[#D4AF37]/20' : ''}`} />
+      <div className={`relative rounded-[2rem] overflow-hidden border backdrop-blur-md bg-white/10 shadow-[0_8px_40px_rgba(0,0,0,0.35)] group-hover:shadow-[0_20px_60px_rgba(0,0,0,0.55)] transition-all duration-500 group-hover:-translate-y-1 active:scale-[0.98] ${isVIP ? 'border-[#D4AF37]/50 shadow-[0_0_30px_rgba(212,175,55,0.3)]' : 'border-white/20'}`}>
 
         <div className="relative h-[58vw] md:h-72 overflow-hidden">
           <Image
@@ -1681,7 +1739,7 @@ function CarCard({ car, index = 0, onClick, onShare, isFavorited, onToggleFavori
               {(car.isVIP === true || car.isVIP === 'true') && (
                 <div className="bg-[#D4AF37] text-white px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md">
                   <Star size={10} fill="white" stroke="none" />
-                  <span className="text-[8px] font-black tracking-[2px] uppercase">{t.carCard.vipChoice}</span>
+                  <span className="text-[8px] font-black tracking-[2px] uppercase">{t.carCard.vip}</span>
                 </div>
               )}
               {/* ── Favorite Heart ── */}

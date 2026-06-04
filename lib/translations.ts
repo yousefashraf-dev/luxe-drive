@@ -73,12 +73,12 @@ const translations = {
     },
     // Filter bar
     filters: {
-      trips: '🗺️ مشاوير',
-      cars: '🚗 عربيات',
-      wedding: '🎊 عربيات زفاف',
-      rental: '🚙 عربيات إيجار',
-      package: '📦 باقات',
-      flowers: '💐 ورد',
+      trips: 'مشاوير',
+      cars: 'عربيات',
+      wedding: 'عربيات زفاف',
+      rental: 'عربيات إيجار',
+      package: 'باقات',
+      flowers: 'ورد',
       favorites: 'المفضلة',
       all: 'الكل',
       withDriver: 'بسائق',
@@ -88,13 +88,13 @@ const translations = {
     // Driver filter
     driver: {
       all: 'الكل',
-      with: '👤 بسائق',
-      without: '🚗 بدون سائق',
+      with: 'بسائق',
+      without: 'بدون سائق',
     },
     // Car card
     carCard: {
       vip: 'VIP',
-      vipChoice: 'VIP Choice',
+      vipChoice: 'VIP',
       activeFleet: 'الأسطول النشط',
       package: 'باقة',
       flowers: 'ورود',
@@ -123,6 +123,7 @@ const translations = {
       call: 'اتصال',
       closeZoom: 'اضغط خارج الصورة للإغلاق',
       shareTooltip: 'مشاركة',
+      contactPrice: 'لمعرفة السعر تواصل واتس',
       favoriteAdd: 'أضف للمفضلة',
       favoriteRemove: 'إزالة من المفضلة',
     },
@@ -396,12 +397,12 @@ const translations = {
     },
     // Filter bar
     filters: {
-      trips: '🗺️ Trips',
-      cars: '🚗 Cars',
-      wedding: '🎊 Wedding Cars',
-      rental: '🚙 Rental Cars',
-      package: '📦 Packages',
-      flowers: '💐 Flowers',
+      trips: 'Trips',
+      cars: 'Cars',
+      wedding: 'Wedding Cars',
+      rental: 'Rental Cars',
+      package: 'Packages',
+      flowers: 'Flowers',
       favorites: 'Favorites',
       all: 'All',
       withDriver: 'With Driver',
@@ -411,8 +412,8 @@ const translations = {
     // Driver filter
     driver: {
       all: 'All',
-      with: '👤 With Driver',
-      without: '🚗 Without Driver',
+      with: 'With Driver',
+      without: 'Without Driver',
     },
     // Car card
     carCard: {
@@ -446,6 +447,7 @@ const translations = {
       call: 'Call',
       closeZoom: 'Click outside to close',
       shareTooltip: 'Share',
+      contactPrice: 'Contact for price',
       favoriteAdd: 'Add to favorites',
       favoriteRemove: 'Remove from favorites',
     },

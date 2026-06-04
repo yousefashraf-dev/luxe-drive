@@ -58,6 +58,12 @@ html {
 }
 * {
   -webkit-overflow-scrolling: touch;
+  touch-action: manipulation;
+}
+
+html, body {
+  overflow-x: hidden;
+  max-width: 100vw;
 }
 
 /* Modal scroll fix for iOS */

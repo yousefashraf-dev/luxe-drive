@@ -76,17 +76,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const isStandalone = typeof window !== 'undefined' &&
       window.matchMedia('(display-mode: standalone)').matches;
 
+    // Check if we're in a PWA / standalone mode → redirect (popup doesn't work)
     if (isStandalone) {
       await signInWithRedirect(auth, provider);
       return;
     }
+
+    // Detect iOS — redirect works better than popup on Safari
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
 
     try {
       await signInWithPopup(auth, provider);
     } catch (err: unknown) {
       const authErr = err as { code?: string; message?: string };
       console.error('Google sign-in error:', authErr.code || err, authErr.message || err);
-      if (authErr.code === 'auth/popup-blocked' || authErr.code === 'auth/popup-closed-by-user') {
+
+      if (authErr.code === 'auth/unauthorized-domain') {
+        throw new Error(
+          `auth/unauthorized-domain — أضف النطاق "${window.location.hostname}" في Firebase Console > Authentication > Settings > Authorized domains`
+        );
+      }
+
+      // Fallback to redirect for popup-blocked, user-closed, or iOS
+      if (
+        authErr.code === 'auth/popup-blocked' ||
+        authErr.code === 'auth/popup-closed-by-user' ||
+        isIOS
+      ) {
         await signInWithRedirect(auth, provider);
       } else {
         throw authErr;
