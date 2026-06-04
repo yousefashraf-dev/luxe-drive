@@ -19,7 +19,7 @@ const translations = {
     // Mobile Hero
     mobileHero: {
       title: 'اكتشف أفخم السيارات والخدمات',
-      subtitle: 'سيارات زفاف، إيجار، ورد، مشاوير، باقات',
+      subtitle: 'سيارات زفاف — إيجار فاخر — ورد — مشاوير — باقات',
     },
     // Locations
     locations: {
@@ -504,7 +504,7 @@ const translations = {
     // Mobile Hero
     mobileHero: {
       title: 'Discover the Finest Cars & Services',
-      subtitle: 'Wedding Cars, Rental, Flowers, Trips, Packages',
+      subtitle: 'Wedding Cars — Luxury Rental — Flowers — Trips — Packages',
     },
     // Locations
     locations: {

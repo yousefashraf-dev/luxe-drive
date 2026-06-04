@@ -1664,7 +1664,7 @@ export default function Home() {
       <footer className="relative z-10 py-16 bg-[#0a0a0a] border-t border-white/5 text-white hidden md:block">
         <div className="max-w-7xl mx-auto px-10 flex flex-col md:flex-row justify-between items-center gap-10">
           <div className="flex flex-col items-center md:items-start gap-2">
-            <p className="text-[10px] font-black uppercase tracking-[6px]">ZaFah</p>
+            <p className="text-[10px] font-black uppercase tracking-[6px]">JOY DRIVE</p>
             <p className="text-[9px] font-bold tracking-[4px] opacity-40 uppercase">{t.common.excellenceDefined}</p>
           </div>
           <div className="flex items-center gap-6">
