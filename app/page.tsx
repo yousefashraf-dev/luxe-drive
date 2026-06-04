@@ -1557,7 +1557,7 @@ export default function Home() {
                     <span className="text-[#c5a059] text-sm font-bold">{t.more.admin}</span>
                   </Link>
                 )}
-                <Link href="/add-ad"
+                <Link href={user ? '/add-ad' : '/login'}
                   onClick={() => setMobileTab('home')}
                   className="flex items-center gap-3 bg-green-500/10 rounded-2xl p-4 border border-green-500/20 hover:bg-green-500/20 transition-all">
                   <Plus size={18} className="text-green-400" />
@@ -1640,7 +1640,7 @@ export default function Home() {
               <Heart size={20} />
               <span className="text-[8px] font-bold tracking-[0.5px]">{t.mobileNav.favorites}</span>
             </button>
-            <Link href="/add-ad"
+            <Link href={user ? '/add-ad' : '/login'}
               className="flex flex-col items-center gap-0.5 px-4 py-1 rounded-xl -mt-3">
               <div className="w-12 h-12 rounded-full bg-[#c5a059] text-black flex items-center justify-center shadow-lg shadow-[#c5a059]/30">
                 <Plus size={22} />
